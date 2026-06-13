@@ -48,7 +48,6 @@ The next world will ask more of you. You won't know exactly what. That's the poi
 
 <br/>
 
----
 
 *Made with dread, curiosity, and respect for the silence of the universe.*
 
