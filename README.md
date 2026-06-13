@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="tge_logo.png" alt="The Great Filter" width="380"/>
+<img src="tgf_logo.png" alt="The Great Filter" width="380"/>
 
 <br/>
 
