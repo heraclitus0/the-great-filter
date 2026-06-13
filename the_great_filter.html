@@ -1349,6 +1349,10 @@ function drawPlanets(ts) {
 // ═══════════════════════════════════════════
 function startGame() {
   stopTitleMusic();
+  // Also hard-close audioCtx so no music bleeds into gameplay
+  setTimeout(() => {
+    if (audioCtx) { try { audioCtx.close(); } catch(e){} audioCtx = null; }
+  }, 600);
   document.getElementById('title-screen').classList.add('hidden');
   initGameState();
   document.getElementById('hud').classList.remove('hidden');
@@ -1494,9 +1498,11 @@ function stopTitleMusic() {
   if (!musicPlaying) return;
   musicPlaying = false;
   if (!audioCtx) return;
-  musicNodes.forEach(n => { try { n.stop ? n.stop(audioCtx.currentTime + 0.5) : n.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5); } catch(e){} });
+  musicNodes.forEach(n => {
+    try { if (typeof n.stop === 'function') n.stop(audioCtx.currentTime + 0.4); } catch(e) {}
+  });
   musicNodes = [];
-  setTimeout(() => { try { audioCtx.close(); } catch(e){} audioCtx = null; }, 700);
+  setTimeout(() => { try { audioCtx.close(); } catch(e){} audioCtx = null; }, 500);
 }
 
 // ── SOUND EFFECTS ───────────────────────────
@@ -1588,7 +1594,7 @@ speakerBtn.style.cssText = `
 speakerBtn.textContent = '♪ ON';
 speakerBtn.addEventListener('click', (e) => {
   e.stopPropagation();
-  sfxClick();
+  if (soundEnabled) sfxClick(); // only play click if sound is currently on
   toggleSound();
 });
 document.body.appendChild(speakerBtn);
