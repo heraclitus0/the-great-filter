@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THE GREAT FILTER</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --black: #05050F;
+    --deep: #0D0D2B;
+    --mid: #1A1A3E;
+    --amber: #F5A623;
+    --green: #39FF14;
+    --red: #FF3131;
+    --purple: #7B2FBE;
+    --blue: #4FC3F7;
+    --white: #E8E8FF;
+    --dim: #6060A0;
+  }
+
+  body {
+    background: var(--black);
+    color: var(--white);
+    font-family: 'Press Start 2P', monospace;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+  }
+
+  #ui {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  /* SCREENS */
+  .screen {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    background: rgba(5,5,15,0.92);
+    pointer-events: all;
+  }
+
+  .screen.hidden { display: none; }
+
+  /* TITLE SCREEN */
+  #title-screen {
+    gap: 32px;
+  }
+
+  .title-main {
+    font-size: clamp(10px, 2.5vw, 22px);
+    color: var(--amber);
+    text-align: center;
+    line-height: 2;
+    text-shadow: 0 0 20px var(--amber);
+    animation: pulse-amber 2s ease-in-out infinite;
+  }
+
+  .title-sub {
+    font-size: clamp(6px, 1.2vw, 11px);
+    color: var(--dim);
+    text-align: center;
+    line-height: 2.5;
+    max-width: 600px;
+  }
+
+  .btn {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(7px, 1.3vw, 12px);
+    padding: 14px 28px;
+    background: transparent;
+    border: 2px solid var(--amber);
+    color: var(--amber);
+    cursor: pointer;
+    transition: all 0.15s;
+    pointer-events: all;
+    text-transform: uppercase;
+  }
+
+  .btn:hover {
+    background: var(--amber);
+    color: var(--black);
+    box-shadow: 0 0 20px var(--amber);
+  }
+
+  .btn-green {
+    border-color: var(--green);
+    color: var(--green);
+  }
+  .btn-green:hover {
+    background: var(--green);
+    color: var(--black);
+    box-shadow: 0 0 20px var(--green);
+  }
+
+  /* HUD */
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    z-index: 15;
+    pointer-events: none;
+  }
+
+  #hud.hidden { display: none; }
+
+  .hud-left { display: flex; flex-direction: column; gap: 6px; }
+  .hud-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+
+  .hud-label {
+    font-size: clamp(5px, 0.9vw, 8px);
+    color: var(--dim);
+  }
+
+  .hud-value {
+    font-size: clamp(6px, 1.1vw, 10px);
+    color: var(--white);
+  }
+
+  .planet-count {
+    font-size: clamp(8px, 1.5vw, 14px);
+    color: var(--amber);
+    text-shadow: 0 0 10px var(--amber);
+  }
+
+  .filter-timer {
+    font-size: clamp(7px, 1.3vw, 12px);
+    color: var(--red);
+    text-shadow: 0 0 10px var(--red);
+    animation: blink 1s step-end infinite;
+  }
+
+  .filter-name-hud {
+    font-size: clamp(5px, 0.9vw, 8px);
+    color: var(--red);
+  }
+
+  /* INVESTMENT PANEL */
+  #invest-panel {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(13,13,43,0.97);
+    border-top: 1px solid var(--mid);
+    padding: 16px 20px;
+    z-index: 15;
+    pointer-events: all;
+  }
+
+  #invest-panel.hidden { display: none; }
+
+  .panel-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .coins-display {
+    font-size: clamp(7px, 1.2vw, 11px);
+    color: var(--amber);
+  }
+
+  .income-display {
+    font-size: clamp(5px, 0.9vw, 8px);
+    color: var(--dim);
+  }
+
+  .fields-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+
+  .field-card {
+    background: rgba(26,26,62,0.8);
+    border: 1px solid var(--mid);
+    padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .field-card:hover {
+    border-color: var(--amber);
+    background: rgba(245,166,35,0.08);
+  }
+
+  .field-card:active { transform: scale(0.97); }
+
+  .field-emoji {
+    font-size: clamp(14px, 2vw, 20px);
+    line-height: 1;
+  }
+
+  .field-name {
+    font-size: clamp(5px, 0.8vw, 7px);
+    color: var(--white);
+  }
+
+  .field-level {
+    font-size: clamp(5px, 0.8vw, 7px);
+    color: var(--amber);
+  }
+
+  .field-bar {
+    height: 3px;
+    background: var(--mid);
+    position: relative;
+  }
+
+  .field-bar-fill {
+    height: 100%;
+    background: var(--amber);
+    transition: width 0.3s;
+  }
+
+  .field-cost {
+    font-size: clamp(4px, 0.7vw, 6px);
+    color: var(--dim);
+  }
+
+  .invest-btn {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(4px, 0.7vw, 6px);
+    padding: 5px 8px;
+    background: transparent;
+    border: 1px solid var(--amber);
+    color: var(--amber);
+    cursor: pointer;
+    width: 100%;
+    margin-top: 2px;
+    transition: all 0.1s;
+  }
+
+  .invest-btn:hover {
+    background: var(--amber);
+    color: var(--black);
+  }
+
+  .invest-btn:disabled {
+    border-color: var(--dim);
+    color: var(--dim);
+    cursor: not-allowed;
+  }
+
+  /* FILTER OVERLAY */
+  #filter-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    pointer-events: none;
+  }
+
+  #filter-overlay.hidden { display: none; }
+
+  .filter-title-big {
+    font-size: clamp(10px, 2vw, 18px);
+    text-align: center;
+    text-shadow: 0 0 30px currentColor;
+    animation: glitch 0.3s infinite;
+  }
+
+  .filter-desc {
+    font-size: clamp(5px, 0.9vw, 8px);
+    color: var(--dim);
+    text-align: center;
+    line-height: 2;
+    max-width: 500px;
+  }
+
+  .filter-result {
+    font-size: clamp(10px, 2vw, 18px);
+    text-align: center;
+  }
+
+  /* GREAT FILTER SCREEN */
+  #great-filter-screen {
+    background: rgba(0,0,0,0.98);
+    gap: 30px;
+  }
+
+  .gf-numbers {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .gf-field {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .gf-emoji { font-size: 28px; }
+
+  .gf-val {
+    font-size: clamp(8px, 1.5vw, 14px);
+    color: var(--white);
+  }
+
+  .gf-label {
+    font-size: clamp(4px, 0.7vw, 6px);
+    color: var(--dim);
+  }
+
+  /* GAME OVER */
+  #gameover-screen { gap: 24px; }
+
+  .extinction-text {
+    font-size: clamp(10px, 2vw, 18px);
+    color: var(--red);
+    text-shadow: 0 0 20px var(--red);
+    text-align: center;
+    line-height: 2;
+  }
+
+  .cause-text {
+    font-size: clamp(5px, 0.9vw, 8px);
+    color: var(--dim);
+    text-align: center;
+    line-height: 2;
+    max-width: 500px;
+  }
+
+  /* WIN SCREEN */
+  #win-screen { gap: 24px; background: rgba(5,5,15,0.97); }
+
+  .win-text {
+    font-size: clamp(8px, 1.5vw, 13px);
+    color: var(--green);
+    text-shadow: 0 0 20px var(--green);
+    text-align: center;
+    line-height: 2.5;
+  }
+
+  .win-sub {
+    font-size: clamp(5px, 0.8vw, 7px);
+    color: var(--dim);
+    text-align: center;
+    line-height: 2.5;
+    max-width: 500px;
+  }
+
+  /* PLANET MOVE SCREEN */
+  #move-screen { gap: 24px; }
+
+  .move-text {
+    font-size: clamp(7px, 1.3vw, 12px);
+    color: var(--blue);
+    text-shadow: 0 0 15px var(--blue);
+    text-align: center;
+    line-height: 2;
+  }
+
+  /* ANIMATIONS */
+  @keyframes pulse-amber {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  @keyframes glitch {
+    0% { transform: translateX(0); }
+    20% { transform: translateX(-2px); }
+    40% { transform: translateX(2px); }
+    60% { transform: translateX(-1px); }
+    80% { transform: translateX(1px); }
+    100% { transform: translateX(0); }
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+  }
+
+  .shake { animation: shake 0.1s infinite; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { display: none; }
+
+  /* WARNING BAR */
+  #warning-bar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    background: var(--red);
+    color: var(--black);
+    text-align: center;
+    padding: 8px;
+    font-size: clamp(5px, 0.9vw, 8px);
+    z-index: 25;
+    display: none;
+    animation: blink 0.5s step-end infinite;
+  }
+
+  /* PLANET INFO */
+  #planet-info {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -120px);
+    text-align: center;
+    z-index: 12;
+    pointer-events: none;
+  }
+
+  #planet-info.hidden { display: none; }
+
+  .planet-name-display {
+    font-size: clamp(7px, 1.3vw, 12px);
+    color: var(--white);
+    text-shadow: 0 0 10px var(--white);
+    margin-bottom: 6px;
+  }
+
+  .solar-system-label {
+    font-size: clamp(4px, 0.7vw, 6px);
+    color: var(--dim);
+  }
+
+  /* SURPLUS HINT */
+  #surplus-bar {
+    position: fixed;
+    bottom: 180px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: clamp(4px, 0.7vw, 6px);
+    color: var(--dim);
+    text-align: center;
+    z-index: 14;
+    pointer-events: none;
+    line-height: 2;
+  }
+
+  #surplus-bar.hidden { display: none; }
+</style>
+</head>
+<body>
+
+<canvas id="space"></canvas>
+
+<!-- TITLE SCREEN -->
+<div id="title-screen" class="screen">
+  <div class="title-main">THE GREAT FILTER</div>
+  <div class="title-sub">
+    most civilizations don't make it.<br>
+    invest wisely. build surplus.<br>
+    the universe decides.
+  </div>
+  <button class="btn" onclick="startGame()">BEGIN</button>
+  <div class="title-sub" style="font-size:clamp(4px,0.7vw,6px); margin-top:8px;">
+    no hints. no tutorials. learn through loss.
+  </div>
+</div>
+
+<!-- GAME OVER SCREEN -->
+<div id="gameover-screen" class="screen hidden">
+  <div class="extinction-text" id="extinction-title">EXTINCTION</div>
+  <div class="cause-text" id="cause-text"></div>
+  <div style="display:flex; gap:16px; flex-wrap:wrap; justify-content:center;">
+    <button class="btn" onclick="restartGame()">TRY AGAIN</button>
+  </div>
+</div>
+
+<!-- WIN SCREEN -->
+<div id="win-screen" class="screen hidden">
+  <div class="win-text">YOU PASSED<br>THE GREAT FILTER</div>
+  <div class="win-sub" id="win-sub-text"></div>
+  <button class="btn btn-green" onclick="continueAfterWin()">EXPAND CIVILIZATION</button>
+</div>
+
+<!-- PLANET MOVE SCREEN -->
+<div id="move-screen" class="screen hidden">
+  <div class="move-text" id="move-text"></div>
+  <button class="btn" style="border-color:var(--blue);color:var(--blue);" onclick="confirmMove()">PROCEED</button>
+</div>
+
+<!-- GREAT FILTER SCREEN -->
+<div id="great-filter-screen" class="screen hidden">
+  <div class="filter-title-big" style="color:var(--white);">✨ THE GREAT FILTER</div>
+  <div class="gf-numbers" id="gf-numbers"></div>
+  <div class="filter-title-big" id="gf-verdict" style="display:none;"></div>
+  <div class="cause-text" id="gf-desc"></div>
+</div>
+
+<!-- FILTER OVERLAY -->
+<div id="filter-overlay" class="hidden">
+  <div class="filter-title-big" id="filter-title-big" style="color:var(--red);"></div>
+  <div class="filter-desc" id="filter-desc"></div>
+  <div class="filter-result" id="filter-result"></div>
+</div>
+
+<!-- WARNING BAR -->
+<div id="warning-bar">⚠ FILTER APPROACHING ⚠</div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div class="hud-left">
+    <div class="hud-label">CIVILIZATION</div>
+    <div class="planet-count" id="planet-count-display">● 1 PLANET</div>
+    <div class="hud-label" style="margin-top:4px;">SOLAR SYSTEM</div>
+    <div class="hud-value" id="system-display">SOL</div>
+  </div>
+  <div class="hud-right">
+    <div id="filter-hud" class="hidden">
+      <div class="filter-name-hud" id="filter-name-hud"></div>
+      <div class="filter-timer" id="filter-timer-display">00:10</div>
+    </div>
+    <div class="hud-label">WAVE</div>
+    <div class="hud-value" id="wave-display">1 / 6</div>
+  </div>
+</div>
+
+<!-- PLANET INFO -->
+<div id="planet-info" class="hidden">
+  <div class="planet-name-display" id="planet-name-display"></div>
+  <div class="solar-system-label" id="solar-system-label"></div>
+</div>
+
+<!-- SURPLUS BAR -->
+<div id="surplus-bar" class="hidden">
+  <div id="surplus-text"></div>
+</div>
+
+<!-- INVESTMENT PANEL -->
+<div id="invest-panel" class="hidden">
+  <div class="panel-top">
+    <div>
+      <div class="coins-display">💰 <span id="coins-display">0</span></div>
+      <div class="income-display">+<span id="income-display">0</span>/sec</div>
+    </div>
+    <div style="text-align:right;">
+      <div class="hud-label">NEXT FILTER IN</div>
+      <div class="filter-timer" id="next-filter-display" style="font-size:clamp(6px,1vw,9px);">--:--</div>
+    </div>
+  </div>
+  <div class="fields-grid" id="fields-grid"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// CANVAS — SPACE BACKGROUND
+// ═══════════════════════════════════════════
+const canvas = document.getElementById('space');
+const ctx = canvas.getContext('2d');
+let W, H, stars = [], planets_visual = [];
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+
+function initStars() {
+  stars = [];
+  for (let i = 0; i < 200; i++) {
+    stars.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: Math.random() * 1.5,
+      alpha: Math.random(),
+      speed: Math.random() * 0.003 + 0.001,
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+// ═══════════════════════════════════════════
+// GAME STATE
+// ═══════════════════════════════════════════
+const FILTERS = [
+  {
+    id: 1, name: "THE PLAGUE", emoji: "🦠", timer: 10,
+    color: "#39FF14",
+    desc: "A pathogen sweeps your civilization. Food feeds it. Science cures it. Energy distributes the cure.",
+    algo: (f, planets) => {
+      // Need food + science + energy balance
+      // Pure food = death. Science without energy = death.
+      const foodScore = Math.min(f.food.level, 8) / 8;
+      const sciScore = Math.min(f.science.level, 8) / 8;
+      const enScore = Math.min(f.energy.level, 6) / 6;
+      // Planet multiplier: more hostile planets = harder food problem
+      const hostility = planets.reduce((a,p) => a + p.foodMult, 0) / planets.length;
+      const cure = sciScore * enScore; // need both
+      const spread = foodScore * (1 + (1-hostility)*0.5); // food feeds population which spreads plague
+      const survival = (cure * 0.6 + enScore * 0.2 + f.society.level/20 * 0.2) - (spread * 0.3);
+      return survival > 0.35;
+    }
+  },
+  {
+    id: 2, name: "THE WAR", emoji: "☢️", timer: 20,
+    color: "#FF3131",
+    desc: "Civilizations armed with power but no wisdom destroy themselves. Energy without Society is annihilation.",
+    algo: (f, planets) => {
+      const enScore = Math.min(f.energy.level, 10) / 10;
+      const socScore = Math.min(f.society.level, 10) / 10;
+      const sciScore = Math.min(f.science.level, 8) / 8;
+      // Balance is key — extremes in either kill you
+      const balance = 1 - Math.abs(enScore - socScore);
+      const deterrence = sciScore * 0.3;
+      const planetStrain = Math.max(0, (planets.length - 1) * 0.08); // more planets = more conflict
+      return (balance * 0.5 + socScore * 0.3 + deterrence - planetStrain) > 0.38;
+    }
+  },
+  {
+    id: 3, name: "CLIMATE COLLAPSE", emoji: "🌡️", timer: 40,
+    color: "#F5A623",
+    desc: "The environment breaks under the weight of growth. Every field matters. No neglected axis survives.",
+    algo: (f, planets) => {
+      const fields = [f.food.level, f.energy.level, f.science.level, f.society.level];
+      const min = Math.min(...fields);
+      const avg = fields.reduce((a,b)=>a+b,0) / 4;
+      // Any neglected field kills. Energy excess damages.
+      const neglect = min < 3 ? 0 : 1;
+      const energyDmg = Math.max(0, (f.energy.level - 8) * 0.05);
+      const foodDmg = Math.max(0, (f.food.level - 9) * 0.04);
+      const sciSolution = Math.min(f.science.level, 10) / 10 * 0.4;
+      const socPolicy = Math.min(f.society.level, 10) / 10 * 0.3;
+      const planetLoad = planets.reduce((a,p) => a + p.energyMult, 0) / planets.length;
+      return neglect && (avg/10 * 0.3 + sciSolution + socPolicy - energyDmg - foodDmg - (planetLoad-1)*0.1) > 0.4;
+    }
+  },
+  {
+    id: 4, name: "THE MACHINE GOD", emoji: "🤖", timer: 80,
+    color: "#7B2FBE",
+    desc: "Intelligence without wisdom is extinction. Science and Society must walk together or neither survives.",
+    algo: (f, planets) => {
+      const sciScore = Math.min(f.science.level, 15) / 15;
+      const socScore = Math.min(f.society.level, 15) / 15;
+      const enScore = Math.min(f.energy.level, 10) / 10;
+      // Gap between sci and soc is lethal in either direction
+      const gap = Math.abs(sciScore - socScore);
+      const gapPenalty = gap * gap * 2;
+      const combined = (sciScore + socScore) / 2;
+      return (combined * 0.6 + enScore * 0.25 - gapPenalty) > 0.42;
+    }
+  },
+  {
+    id: 5, name: "THE SIGNAL", emoji: "👽", timer: 160,
+    color: "#4FC3F7",
+    desc: "Something vast is watching. A fractured, militaristic, primitive civilization is either a threat or irrelevant.",
+    algo: (f, planets) => {
+      const fields = [f.food.level, f.energy.level, f.science.level, f.society.level];
+      const min = Math.min(...fields);
+      const enScore = f.energy.level / 20;
+      const socScore = f.society.level / 20;
+      const sciScore = f.science.level / 20;
+      // All must be high. Society weighted most. Energy excess = threat.
+      const threat = Math.max(0, enScore - socScore - 0.1);
+      const primitive = sciScore < 0.4 ? (0.4 - sciScore) : 0;
+      const planetChaos = Math.max(0, (planets.length - 1) * 0.05 * (1 - socScore));
+      return (socScore * 0.4 + sciScore * 0.3 + min/20 * 0.3 - threat * 0.5 - primitive - planetChaos) > 0.35;
+    }
+  },
+  {
+    id: 6, name: "THE GREAT FILTER", emoji: "✨", timer: -1, // -1 = unpredictable
+    color: "#E8E8FF",
+    desc: "Nobody knows what it tests. The universe decides.",
+    algo: (f, planets) => {
+      // Hidden weights change every run
+      const w = window._gfWeights;
+      const fields = [f.food.level, f.energy.level, f.science.level, f.society.level];
+      const score = fields.reduce((a,v,i) => a + v * w[i], 0);
+      const maxScore = 20 * w.reduce((a,b)=>a+b,0);
+      const ratio = score / maxScore;
+      // Balance bonus
+      const min = Math.min(...fields);
+      const max = Math.max(...fields);
+      const balance = min / Math.max(max, 1);
+      // Survival probability
+      let prob;
+      if (balance > 0.7 && ratio > 0.5) prob = 0.90;
+      else if (balance > 0.5 && ratio > 0.35) prob = 0.60;
+      else prob = 0.20;
+      return Math.random() < prob;
+    }
+  }
+];
+
+const PLANETS = [
+  { name: "EARTH", color: "#4FC3F7", glowColor: "#2196F3", foodMult: 1.0, energyMult: 1.0, sciMult: 1.0, socMult: 1.0, known: true, system: "SOL" },
+  { name: "MARS", color: "#CF6F3A", glowColor: "#FF5722", foodMult: 2.8, energyMult: 2.0, sciMult: 1.0, socMult: 1.2, known: true, system: "SOL" },
+  { name: "EUROPA", color: "#B0BEC5", glowColor: "#90A4AE", foodMult: 4.5, energyMult: 2.5, sciMult: 0.7, socMult: 1.5, known: true, system: "SOL" },
+  { name: "TITAN", color: "#FFA726", glowColor: "#FF9800", foodMult: 3.2, energyMult: 1.8, sciMult: 0.8, socMult: 2.0, known: true, system: "SOL" },
+  { name: "KEPLER-452b", color: "#81C784", glowColor: "#4CAF50", foodMult: 1.1, energyMult: 1.2, sciMult: 1.0, socMult: 1.8, known: false, system: "KEPLER" },
+  { name: "KEPLER-62f", color: "#A5D6A7", glowColor: "#66BB6A", foodMult: 1.3, energyMult: 1.4, sciMult: 0.9, socMult: 2.2, known: false, system: "KEPLER" },
+  { name: "PROXIMA b", color: "#CE93D8", glowColor: "#AB47BC", foodMult: 2.0, energyMult: 3.5, sciMult: 1.2, socMult: 1.0, known: false, system: "PROXIMA" },
+  { name: "TRAPPIST-1e", color: "#80CBC4", glowColor: "#26A69A", foodMult: 1.5, energyMult: 2.0, sciMult: 0.8, socMult: 1.6, known: false, system: "TRAPPIST" },
+  { name: "TRAPPIST-1f", color: "#80DEEA", glowColor: "#00BCD4", foodMult: 1.8, energyMult: 1.6, sciMult: 1.1, socMult: 1.4, known: false, system: "TRAPPIST" },
+  { name: "GJ 667Cc", color: "#FFAB91", glowColor: "#FF7043", foodMult: 2.5, energyMult: 2.8, sciMult: 1.5, socMult: 1.0, known: false, system: "GJ667" },
+  { name: "HD 40307g", color: "#B39DDB", glowColor: "#7E57C2", foodMult: 3.0, energyMult: 2.2, sciMult: 1.3, socMult: 1.8, known: false, system: "HD40307" },
+  { name: "UNKNOWN-α", color: "#F48FB1", glowColor: "#E91E63", foodMult: 4.0, energyMult: 4.0, sciMult: 2.0, socMult: 3.0, known: false, system: "UNKNOWN" },
+  { name: "UNKNOWN-β", color: "#FFE082", glowColor: "#FFC107", foodMult: 5.0, energyMult: 3.0, sciMult: 0.5, socMult: 4.0, known: false, system: "UNKNOWN" },
+];
+
+let G = {}; // game state
+
+function initGameState() {
+  // Randomize Great Filter weights
+  window._gfWeights = [
+    Math.random() * 0.4 + 0.1,
+    Math.random() * 0.4 + 0.1,
+    Math.random() * 0.4 + 0.1,
+    Math.random() * 0.4 + 0.1,
+  ];
+
+  // Pick starting planet (always Earth first)
+  const availablePlanets = [...PLANETS];
+  const earthIdx = availablePlanets.findIndex(p => p.name === "EARTH");
+  const earth = availablePlanets.splice(earthIdx, 1)[0];
+
+  // Shuffle remaining
+  for (let i = availablePlanets.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [availablePlanets[i], availablePlanets[j]] = [availablePlanets[j], availablePlanets[i]];
+  }
+
+  // Current solar system gets 1-3 additional habitable planets
+  const sysCount = Math.floor(Math.random() * 3) + 1;
+  const currentSystemPool = availablePlanets.splice(0, sysCount);
+  const futurePool = availablePlanets;
+
+  G = {
+    phase: 'playing', // playing, filter, greatfilter, gameover, win, move
+    coins: 50,
+    coinsPerSec: 5,
+    fields: {
+      food:    { level: 0, emoji: "🌾", name: "FOOD",    baseCost: 10 },
+      energy:  { level: 0, emoji: "⚡", name: "ENERGY",  baseCost: 10 },
+      science: { level: 0, emoji: "🔬", name: "SCIENCE", baseCost: 10 },
+      society: { level: 0, emoji: "🤝", name: "SOCIETY", baseCost: 10 },
+    },
+    currentPlanets: [earth],
+    systemPool: currentSystemPool,
+    futurePool: futurePool,
+    bannedThisRun: [],
+    currentWave: 0, // 0-indexed, so filter[0] = plague
+    filterActive: false,
+    filterTimeLeft: FILTERS[0].timer,
+    warningShown: false,
+    totalPlanetsEver: 1,
+    solarSystemNum: 1,
+    tick: 0,
+    planetHealth: 1.0, // 0-1, visual only
+    glitching: false,
+  };
+
+  updateIncomeRate();
+}
+
+function updateIncomeRate() {
+  const f = G.fields;
+  const planets = G.currentPlanets;
+  // Base income from fields
+  const base = 5 + f.food.level * 1.5 + f.energy.level * 1.2 + f.science.level * 0.8 + f.society.level * 1.0;
+  // Planet multiplier for income (more planets = more income)
+  const planetMult = planets.length;
+  // Average cost mult (hostile planets drain income efficiency)
+  const avgHostility = planets.reduce((a,p) => a + (p.foodMult + p.energyMult)/2, 0) / planets.length;
+  G.coinsPerSec = Math.max(1, Math.round((base * planetMult) / (avgHostility * 0.5 + 0.5)));
+}
+
+function getFieldCost(fieldKey) {
+  const f = G.fields[fieldKey];
+  const planet = G.currentPlanets[G.currentPlanets.length - 1];
+  const mults = { food: planet.foodMult, energy: planet.energyMult, science: planet.sciMult, society: planet.socMult };
+  return Math.round(f.baseCost * (1 + f.level * 0.8) * mults[fieldKey]);
+}
+
+// ═══════════════════════════════════════════
+// RENDER PANEL
+// ═══════════════════════════════════════════
+function renderPanel() {
+  const grid = document.getElementById('fields-grid');
+  grid.innerHTML = '';
+  Object.entries(G.fields).forEach(([key, f]) => {
+    const cost = getFieldCost(key);
+    const canAfford = G.coins >= cost;
+    const maxLevel = 25;
+    const pct = (f.level / maxLevel) * 100;
+    const card = document.createElement('div');
+    card.className = 'field-card';
+    card.innerHTML = `
+      <div class="field-emoji">${f.emoji}</div>
+      <div class="field-name">${f.name}</div>
+      <div class="field-level">LV ${f.level}</div>
+      <div class="field-bar"><div class="field-bar-fill" style="width:${pct}%"></div></div>
+      <div class="field-cost">COST: ${cost} 💰</div>
+      <button class="invest-btn" ${canAfford ? '' : 'disabled'} onclick="invest('${key}')">INVEST</button>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function invest(key) {
+  const cost = getFieldCost(key);
+  if (G.coins < cost) return;
+  G.coins -= cost;
+  G.fields[key].level++;
+  updateIncomeRate();
+  renderPanel();
+  updateHUD();
+}
+
+// ═══════════════════════════════════════════
+// HUD
+// ═══════════════════════════════════════════
+function updateHUD() {
+  document.getElementById('coins-display').textContent = Math.floor(G.coins);
+  document.getElementById('income-display').textContent = G.coinsPerSec;
+  document.getElementById('planet-count-display').textContent = `● ${G.currentPlanets.length} PLANET${G.currentPlanets.length > 1 ? 'S' : ''}`;
+  document.getElementById('wave-display').textContent = `${G.currentWave + 1} / 6`;
+  document.getElementById('system-display').textContent = `SYSTEM ${G.solarSystemNum}`;
+
+  // Planet name
+  const cp = G.currentPlanets[G.currentPlanets.length - 1];
+  document.getElementById('planet-name-display').textContent = cp.name;
+  document.getElementById('planet-name-display').style.color = cp.glowColor;
+
+  // Filter timer
+  if (G.currentWave < 5 && !G.filterActive) {
+    const t = Math.ceil(G.filterTimeLeft);
+    const mins = Math.floor(t / 60).toString().padStart(2,'0');
+    const secs = (t % 60).toString().padStart(2,'0');
+    document.getElementById('next-filter-display').textContent = `${mins}:${secs}`;
+    document.getElementById('filter-name-hud').textContent = FILTERS[G.currentWave].name;
+    document.getElementById('filter-hud').classList.remove('hidden');
+  } else if (G.currentWave === 5) {
+    document.getElementById('next-filter-display').textContent = '???';
+    document.getElementById('filter-name-hud').textContent = '✨ APPROACHING';
+    document.getElementById('filter-hud').classList.remove('hidden');
+  }
+
+  // Surplus text
+  const fields = Object.values(G.fields);
+  const min = Math.min(...fields.map(f=>f.level));
+  const max = Math.max(...fields.map(f=>f.level));
+  const balance = max > 0 ? min/max : 1;
+  let surplusMsg = '';
+  if (G.currentPlanets.length > 0 && G.systemPool.length > 0) {
+    surplusMsg = 'BUILD SURPLUS NOW. THE NEXT PLANET WILL DEMAND MORE.';
+  }
+  if (balance < 0.4 && max > 3) {
+    surplusMsg = 'WARNING: YOUR CIVILIZATION IS IMBALANCED.';
+  }
+  document.getElementById('surplus-text').textContent = surplusMsg;
+}
+
+// ═══════════════════════════════════════════
+// GAME LOOP
+// ═══════════════════════════════════════════
+let lastTime = 0;
+let accumulator = 0;
+
+function gameLoop(ts) {
+  const dt = Math.min((ts - lastTime) / 1000, 0.1);
+  lastTime = ts;
+
+  // Draw space
+  drawSpace(ts);
+
+  if (G.phase === 'playing') {
+    accumulator += dt;
+    if (accumulator >= 1) {
+      G.coins += G.coinsPerSec;
+      accumulator = 0;
+      renderPanel();
+      updateHUD();
+    }
+
+    // Filter timer countdown
+    if (!G.filterActive && G.currentWave < 6) {
+      if (G.currentWave < 5) {
+        G.filterTimeLeft -= dt;
+
+        // Warning at 30% time left
+        const totalTime = FILTERS[G.currentWave].timer;
+        if (G.filterTimeLeft < totalTime * 0.3 && !G.warningShown) {
+          G.warningShown = true;
+          document.getElementById('warning-bar').style.display = 'block';
+        }
+
+        if (G.filterTimeLeft <= 0) {
+          G.filterTimeLeft = 0;
+          triggerFilter(G.currentWave);
+        }
+      } else {
+        // Great filter: random arrival between 60-160 seconds
+        G.filterTimeLeft -= dt;
+        if (G.filterTimeLeft <= 0) {
+          triggerGreatFilter();
+        }
+      }
+    }
+
+    // Update HUD timer live
+    if (!G.filterActive && G.currentWave < 5) {
+      const t = Math.ceil(G.filterTimeLeft);
+      const mins = Math.floor(t / 60).toString().padStart(2,'0');
+      const secs = (t % 60).toString().padStart(2,'0');
+      document.getElementById('next-filter-display').textContent = `${mins}:${secs}`;
+    }
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ═══════════════════════════════════════════
+// FILTER LOGIC
+// ═══════════════════════════════════════════
+function triggerFilter(waveIdx) {
+  G.filterActive = true;
+  G.phase = 'filter';
+  document.getElementById('warning-bar').style.display = 'none';
+  G.warningShown = false;
+
+  const filter = FILTERS[waveIdx];
+  const passed = filter.algo(G.fields, G.currentPlanets);
+
+  document.getElementById('invest-panel').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('planet-info').classList.add('hidden');
+  document.getElementById('surplus-bar').classList.add('hidden');
+
+  const overlay = document.getElementById('filter-overlay');
+  overlay.classList.remove('hidden');
+  overlay.style.background = `rgba(0,0,0,0.85)`;
+
+  document.getElementById('filter-title-big').textContent = `${filter.emoji} ${filter.name}`;
+  document.getElementById('filter-title-big').style.color = filter.color;
+  document.getElementById('filter-desc').textContent = filter.desc;
+  document.getElementById('filter-result').textContent = '';
+
+  // Glitch effect
+  G.glitching = true;
+  document.body.classList.add('shake');
+
+  setTimeout(() => {
+    document.body.classList.remove('shake');
+    G.glitching = false;
+    const resultEl = document.getElementById('filter-result');
+    if (passed) {
+      resultEl.textContent = '✓ CIVILIZATION ENDURES';
+      resultEl.style.color = '#39FF14';
+      resultEl.style.textShadow = '0 0 20px #39FF14';
+      setTimeout(() => resolveFilterPass(waveIdx), 2000);
+    } else {
+      resultEl.textContent = '✗ CIVILIZATION FALLS';
+      resultEl.style.color = '#FF3131';
+      resultEl.style.textShadow = '0 0 20px #FF3131';
+      setTimeout(() => resolveFilterFail(filter), 2000);
+    }
+  }, 2000);
+}
+
+function resolveFilterPass(waveIdx) {
+  document.getElementById('filter-overlay').classList.add('hidden');
+  G.filterActive = false;
+  G.currentWave++;
+
+  if (G.currentWave === 5) {
+    // Set random timer for great filter
+    G.filterTimeLeft = Math.random() * 100 + 60;
+    document.getElementById('next-filter-display').textContent = '???';
+  } else {
+    G.filterTimeLeft = FILTERS[G.currentWave].timer;
+  }
+
+  G.phase = 'playing';
+  document.getElementById('invest-panel').classList.remove('hidden');
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('planet-info').classList.remove('hidden');
+  document.getElementById('surplus-bar').classList.remove('hidden');
+  renderPanel();
+  updateHUD();
+}
+
+function resolveFilterFail(filter) {
+  document.getElementById('filter-overlay').classList.add('hidden');
+
+  // Can we fall back to another planet?
+  if (G.currentPlanets.length > 1) {
+    // Lose the most hostile planet
+    const lost = G.currentPlanets.pop();
+    G.bannedThisRun.push(lost.name);
+    showPlanetLost(lost, filter);
+  } else if (G.systemPool.length > 0) {
+    // Single planet — try next in system
+    const lost = G.currentPlanets[0];
+    G.bannedThisRun.push(lost.name);
+    showExtinctionWithFallback(lost, filter);
+  } else {
+    // Full game over
+    showGameOver(filter);
+  }
+}
+
+function showPlanetLost(planet, filter) {
+  G.phase = 'move';
+  document.getElementById('move-text').innerHTML =
+    `${planet.name} IS LOST.<br><br>YOUR CIVILIZATION RETREATS.<br><br>` +
+    `THE REMAINING PLANETS HOLD.`;
+  document.getElementById('move-screen').classList.remove('hidden');
+  document.getElementById('move-screen').querySelector('button').onclick = () => {
+    document.getElementById('move-screen').classList.add('hidden');
+    G.filterActive = false;
+    G.phase = 'playing';
+    // Continue from current wave
+    G.filterTimeLeft = G.currentWave < 5 ? FILTERS[G.currentWave].timer : Math.random()*100+60;
+    updateIncomeRate();
+    document.getElementById('invest-panel').classList.remove('hidden');
+    document.getElementById('hud').classList.remove('hidden');
+    document.getElementById('planet-info').classList.remove('hidden');
+    document.getElementById('surplus-bar').classList.remove('hidden');
+    renderPanel();
+    updateHUD();
+  };
+}
+
+function showExtinctionWithFallback(planet, filter) {
+  // Move to next planet in system pool
+  const nextPlanet = G.systemPool.shift();
+  G.currentPlanets = [nextPlanet];
+  G.phase = 'move';
+
+  document.getElementById('move-text').innerHTML =
+    `${planet.name} IS LOST TO ${filter.emoji} ${filter.name}.<br><br>` +
+    `YOUR SPECIES FLED TO ${nextPlanet.name}.<br><br>` +
+    `${nextPlanet.known ? 'YOU KNOW THIS PLACE FROM OBSERVATION.' : 'THIS WORLD IS LARGELY UNKNOWN TO YOU.'}<br><br>` +
+    `BUILD CAREFULLY. THERE IS NO MORE GOING BACK.`;
+
+  document.getElementById('move-screen').classList.remove('hidden');
+  document.getElementById('move-screen').querySelector('button').onclick = () => {
+    document.getElementById('move-screen').classList.add('hidden');
+    G.filterActive = false;
+    G.currentWave = 0; // Reset waves on new planet
+    G.filterTimeLeft = FILTERS[0].timer;
+    G.phase = 'playing';
+    updateIncomeRate();
+    document.getElementById('invest-panel').classList.remove('hidden');
+    document.getElementById('hud').classList.remove('hidden');
+    document.getElementById('planet-info').classList.remove('hidden');
+    document.getElementById('surplus-bar').classList.remove('hidden');
+    renderPanel();
+    updateHUD();
+  };
+}
+
+function showGameOver(filter) {
+  G.phase = 'gameover';
+  document.getElementById('gameover-screen').classList.remove('hidden');
+  document.getElementById('extinction-title').textContent = 'EXTINCTION';
+  document.getElementById('cause-text').innerHTML =
+    `YOUR CIVILIZATION FELL TO<br>${filter.emoji} ${filter.name}.<br><br>` +
+    `PLANETS COLONIZED: ${G.totalPlanetsEver}<br>` +
+    `FILTERS SURVIVED: ${G.currentWave}<br><br>` +
+    `THE UNIVERSE DOES NOT REMEMBER YOU.`;
+}
+
+// ═══════════════════════════════════════════
+// GREAT FILTER
+// ═══════════════════════════════════════════
+function triggerGreatFilter() {
+  G.filterActive = true;
+  G.phase = 'greatfilter';
+
+  document.getElementById('invest-panel').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('planet-info').classList.add('hidden');
+  document.getElementById('surplus-bar').classList.add('hidden');
+  document.getElementById('warning-bar').style.display = 'none';
+
+  const gfScreen = document.getElementById('great-filter-screen');
+  gfScreen.classList.remove('hidden');
+
+  // Show numbers
+  const numDiv = document.getElementById('gf-numbers');
+  numDiv.innerHTML = Object.entries(G.fields).map(([k,f]) =>
+    `<div class="gf-field">
+      <div class="gf-emoji">${f.emoji}</div>
+      <div class="gf-val">${f.level}</div>
+      <div class="gf-label">${f.name}</div>
+    </div>`
+  ).join('');
+
+  document.getElementById('gf-verdict').style.display = 'none';
+  document.getElementById('gf-desc').textContent = '';
+
+  // 3 second pause then verdict
+  setTimeout(() => {
+    document.getElementById('gf-desc').textContent = 'THE UNIVERSE DECIDES';
+    setTimeout(() => {
+      const passed = FILTERS[5].algo(G.fields, G.currentPlanets);
+      const verdict = document.getElementById('gf-verdict');
+      verdict.style.display = 'block';
+      if (passed) {
+        verdict.textContent = '✓ YOU PASS';
+        verdict.style.color = '#39FF14';
+        verdict.style.textShadow = '0 0 30px #39FF14';
+        setTimeout(() => {
+          gfScreen.classList.add('hidden');
+          showWin();
+        }, 3000);
+      } else {
+        verdict.textContent = '✗ YOU FALL';
+        verdict.style.color = '#FF3131';
+        verdict.style.textShadow = '0 0 30px #FF3131';
+        setTimeout(() => {
+          gfScreen.classList.add('hidden');
+          showGameOver(FILTERS[5]);
+        }, 3000);
+      }
+    }, 3000);
+  }, 3000);
+}
+
+function showWin() {
+  G.phase = 'win';
+  document.getElementById('win-screen').classList.remove('hidden');
+  const planets = G.currentPlanets.length;
+  document.getElementById('win-sub-text').innerHTML =
+    `YOU ARE ONE OF THE FEW.<br><br>` +
+    `PLANETS: ${G.totalPlanetsEver} | FILTERS SURVIVED: 6<br><br>` +
+    `YOUR CIVILIZATION CONTINUES INTO THE UNKNOWN.`;
+}
+
+function continueAfterWin() {
+  document.getElementById('win-screen').classList.add('hidden');
+
+  // Move to next planet
+  let nextPlanet = null;
+  if (G.systemPool.length > 0) {
+    nextPlanet = G.systemPool.shift();
+    G.currentPlanets.push(nextPlanet);
+  } else if (G.futurePool.length > 0) {
+    // New solar system
+    G.solarSystemNum++;
+    nextPlanet = G.futurePool.shift();
+    G.currentPlanets.push(nextPlanet);
+
+    // Give new system some planets
+    const newSysCount = Math.floor(Math.random() * 3) + 1;
+    for (let i = 0; i < newSysCount && G.futurePool.length > 0; i++) {
+      G.systemPool.push(G.futurePool.shift());
+    }
+  }
+
+  if (nextPlanet) {
+    G.totalPlanetsEver++;
+    G.currentWave = 0;
+    G.filterTimeLeft = FILTERS[0].timer;
+    G.filterActive = false;
+    G.phase = 'playing';
+    G.warningShown = false;
+    updateIncomeRate();
+
+    document.getElementById('move-text').innerHTML =
+      `YOUR CIVILIZATION EXPANDS.<br><br>` +
+      `ARRIVING AT ${nextPlanet.name}.<br><br>` +
+      `${nextPlanet.known ? 'YOU HAVE STUDIED THIS WORLD FROM AFAR.' : 'LITTLE IS KNOWN OF THIS PLACE.'}<br><br>` +
+      `THE FILTERS WILL COME AGAIN.`;
+    document.getElementById('move-screen').classList.remove('hidden');
+    document.getElementById('move-screen').querySelector('button').onclick = () => {
+      document.getElementById('move-screen').classList.add('hidden');
+      document.getElementById('invest-panel').classList.remove('hidden');
+      document.getElementById('hud').classList.remove('hidden');
+      document.getElementById('planet-info').classList.remove('hidden');
+      document.getElementById('surplus-bar').classList.remove('hidden');
+      renderPanel();
+      updateHUD();
+    };
+  } else {
+    // No more planets — intergalactic achieved
+    document.getElementById('win-sub-text').innerHTML =
+      `YOU HAVE TRANSCENDED THE SOLAR SCALE.<br><br>` +
+      `INTERGALACTIC CIVILIZATION ACHIEVED.<br><br>` +
+      `FEW HAVE EVER REACHED THIS.`;
+    document.getElementById('win-screen').classList.remove('hidden');
+    document.getElementById('win-screen').querySelector('button').style.display = 'none';
+  }
+}
+
+// ═══════════════════════════════════════════
+// CANVAS DRAWING
+// ═══════════════════════════════════════════
+function drawSpace(ts) {
+  ctx.clearRect(0, 0, W, H);
+
+  // Deep space gradient
+  const grad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W*0.7);
+  grad.addColorStop(0, '#0D0D2B');
+  grad.addColorStop(1, '#05050F');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Stars
+  stars.forEach(s => {
+    s.alpha = 0.3 + 0.7 * Math.abs(Math.sin(ts * s.speed + s.phase));
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(232,232,255,${s.alpha})`;
+    ctx.fill();
+  });
+
+  if (G.phase && G.phase !== 'gameover' && G.currentPlanets) {
+    drawPlanets(ts);
+  }
+}
+
+function drawPlanets(ts) {
+  const planets = G.currentPlanets;
+  if (!planets || planets.length === 0) return;
+
+  const cx = W / 2;
+  const cy = H / 2 - 60;
+
+  planets.forEach((planet, i) => {
+    const angle = (i / Math.max(planets.length, 1)) * Math.PI * 2 - Math.PI / 2;
+    const orbitR = planets.length === 1 ? 0 : 80 + i * 30;
+    const px = cx + Math.cos(angle) * orbitR;
+    const py = cy + Math.sin(angle) * orbitR;
+    const pr = planets.length === 1 ? 55 : 35 - i * 3;
+
+    // Pulse
+    const pulse = Math.sin(ts * 0.001 + i) * 3;
+
+    // Glow
+    const glowSize = pr + 20 + pulse;
+    const glow = ctx.createRadialGradient(px, py, pr * 0.5, px, py, glowSize);
+    glow.addColorStop(0, planet.glowColor + 'AA');
+    glow.addColorStop(1, planet.glowColor + '00');
+    ctx.beginPath();
+    ctx.arc(px, py, glowSize, 0, Math.PI * 2);
+    ctx.fillStyle = glow;
+    ctx.fill();
+
+    // Planet body
+    const bodyGrad = ctx.createRadialGradient(px - pr*0.3, py - pr*0.3, pr*0.1, px, py, pr + pulse*0.5);
+    bodyGrad.addColorStop(0, planet.color + 'FF');
+    bodyGrad.addColorStop(0.7, planet.color + 'CC');
+    bodyGrad.addColorStop(1, planet.glowColor + '88');
+    ctx.beginPath();
+    ctx.arc(px, py, pr + pulse * 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = bodyGrad;
+    ctx.fill();
+
+    // Pixel texture overlay
+    ctx.globalAlpha = 0.15;
+    for (let px2 = -pr; px2 < pr; px2 += 4) {
+      for (let py2 = -pr; py2 < pr; py2 += 4) {
+        if (px2*px2 + py2*py2 < pr*pr) {
+          if (Math.random() < 0.3) {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(px + px2, py + py2, 3, 3);
+          }
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // Glitch effect during filter
+    if (G.glitching) {
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = '#FF3131';
+      ctx.fillRect(px - pr, py - 2, pr * 2 * Math.random(), 2);
+      ctx.fillRect(px - pr, py + 5, pr * 1.5 * Math.random(), 2);
+      ctx.globalAlpha = 1;
+    }
+  });
+
+  // Orbit rings for multi-planet
+  if (planets.length > 1) {
+    planets.forEach((_, i) => {
+      if (i === 0) return;
+      const orbitR = 80 + i * 30;
+      ctx.beginPath();
+      ctx.arc(cx, cy, orbitR, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(96,96,160,0.2)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
+  }
+}
+
+// ═══════════════════════════════════════════
+// GAME FLOW
+// ═══════════════════════════════════════════
+function startGame() {
+  stopTitleMusic();
+  document.getElementById('title-screen').classList.add('hidden');
+  initGameState();
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('invest-panel').classList.remove('hidden');
+  document.getElementById('planet-info').classList.remove('hidden');
+  document.getElementById('surplus-bar').classList.remove('hidden');
+  renderPanel();
+  updateHUD();
+  G.phase = 'playing';
+}
+
+function restartGame() {
+  // Hide all screens
+  ['gameover-screen','win-screen','move-screen','great-filter-screen','filter-overlay']
+    .forEach(id => document.getElementById(id).classList.add('hidden'));
+  document.getElementById('warning-bar').style.display = 'none';
+
+  startGame();
+}
+
+function confirmMove() {
+  // handled inline per move
+}
+
+// ═══════════════════════════════════════════
+// SAVE / LOAD
+// ═══════════════════════════════════════════
+function saveGame() {
+  if (G.phase === 'playing') {
+    localStorage.setItem('tgf_save', JSON.stringify({
+      coins: G.coins,
+      fields: G.fields,
+      currentPlanets: G.currentPlanets,
+      systemPool: G.systemPool,
+      futurePool: G.futurePool,
+      bannedThisRun: G.bannedThisRun,
+      currentWave: G.currentWave,
+      filterTimeLeft: G.filterTimeLeft,
+      totalPlanetsEver: G.totalPlanetsEver,
+      solarSystemNum: G.solarSystemNum,
+      gfWeights: window._gfWeights,
+    }));
+  }
+}
+
+// Auto-save every 10 seconds
+setInterval(saveGame, 10000);
+
+// ═══════════════════════════════════════════
+// MUSIC — TITLE SCREEN AMBIENT
+// ═══════════════════════════════════════════
+let audioCtx = null;
+let musicNodes = [];
+let musicPlaying = false;
+
+function startTitleMusic() {
+  if (musicPlaying) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  musicPlaying = true;
+
+  // Master gain — quiet overall
+  const master = audioCtx.createGain();
+  master.gain.setValueAtTime(0, audioCtx.currentTime);
+  master.gain.linearRampToValueAtTime(0.18, audioCtx.currentTime + 4);
+  master.connect(audioCtx.destination);
+
+  // Deep bass drone — the void
+  const bass = audioCtx.createOscillator();
+  const bassGain = audioCtx.createGain();
+  bass.type = 'sine';
+  bass.frequency.setValueAtTime(36, audioCtx.currentTime);
+  bass.frequency.linearRampToValueAtTime(38, audioCtx.currentTime + 12);
+  bass.frequency.linearRampToValueAtTime(34, audioCtx.currentTime + 24);
+  bass.frequency.linearRampToValueAtTime(36, audioCtx.currentTime + 36);
+  bassGain.gain.setValueAtTime(0.7, audioCtx.currentTime);
+  bass.connect(bassGain);
+  bassGain.connect(master);
+  bass.start();
+  musicNodes.push(bass);
+
+  // Mid drone — slow pulse
+  const mid = audioCtx.createOscillator();
+  const midGain = audioCtx.createGain();
+  mid.type = 'sine';
+  mid.frequency.setValueAtTime(72, audioCtx.currentTime);
+  midGain.gain.setValueAtTime(0, audioCtx.currentTime);
+  // Slow amplitude breathing
+  function breatheMid() {
+    if (!musicPlaying) return;
+    const t = audioCtx.currentTime;
+    midGain.gain.linearRampToValueAtTime(0.3, t + 4);
+    midGain.gain.linearRampToValueAtTime(0.05, t + 8);
+    setTimeout(breatheMid, 8000);
+  }
+  breatheMid();
+  mid.connect(midGain);
+  midGain.connect(master);
+  mid.start();
+  musicNodes.push(mid);
+
+  // High sparse signal notes — distant transmissions
+  function spawnSignal() {
+    if (!musicPlaying) return;
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    // Random high frequency — like a signal from somewhere far
+    const freq = [220, 277, 311, 370, 440, 523, 622][Math.floor(Math.random() * 7)];
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    g.gain.setValueAtTime(0, audioCtx.currentTime);
+    g.gain.linearRampToValueAtTime(0.08, audioCtx.currentTime + 0.3);
+    g.gain.linearRampToValueAtTime(0.04, audioCtx.currentTime + 1.5);
+    g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 3);
+    osc.connect(g);
+    g.connect(master);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 3.5);
+    // Next signal — random gap 3 to 9 seconds
+    const nextIn = 3000 + Math.random() * 6000;
+    setTimeout(spawnSignal, nextIn);
+  }
+  // First signal after a brief silence
+  setTimeout(spawnSignal, 3000);
+
+  // Very subtle noise layer — cosmic static
+  const bufferSize = audioCtx.sampleRate * 2;
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.015;
+  const noise = audioCtx.createBufferSource();
+  const noiseGain = audioCtx.createGain();
+  const noiseFilter = audioCtx.createBiquadFilter();
+  noiseFilter.type = 'lowpass';
+  noiseFilter.frequency.value = 400;
+  noise.buffer = buffer;
+  noise.loop = true;
+  noiseGain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+  noise.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(master);
+  noise.start();
+  musicNodes.push(noise);
+}
+
+function stopTitleMusic() {
+  if (!musicPlaying || !audioCtx) return;
+  musicPlaying = false;
+  // Fade out
+  const master = audioCtx.createGain();
+  musicNodes.forEach(n => { try { n.stop(audioCtx.currentTime + 1); } catch(e){} });
+  musicNodes = [];
+  setTimeout(() => {
+    try { audioCtx.close(); } catch(e){}
+    audioCtx = null;
+  }, 1200);
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+window.addEventListener('resize', () => { resize(); initStars(); });
+resize();
+initStars();
+requestAnimationFrame(gameLoop);
+
+// Start music on first user interaction with title screen
+document.getElementById('title-screen').addEventListener('click', () => {
+  startTitleMusic();
+}, { once: false });
+
+// Tiny speaker toggle on title
+const speakerBtn = document.createElement('div');
+speakerBtn.style.cssText = `
+  position: fixed; bottom: 20px; right: 20px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px; color: #6060A0;
+  cursor: pointer; z-index: 100;
+  user-select: none;
+`;
+speakerBtn.textContent = '♪ ON';
+speakerBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (musicPlaying) {
+    stopTitleMusic();
+    speakerBtn.textContent = '♪ OFF';
+    speakerBtn.style.color = '#3A3A60';
+  } else {
+    startTitleMusic();
+    speakerBtn.textContent = '♪ ON';
+    speakerBtn.style.color = '#6060A0';
+  }
+});
+document.body.appendChild(speakerBtn);
+</script>
+</body>
+</html>
