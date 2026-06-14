@@ -63,6 +63,7 @@ This is also why losing always feels fair. The player can never say the game did
 - Fail = planet cracks, goes dark, civilization retreats
 - Jumping to new solar system = dramatic moment, different star color, different planet aesthetics entirely
 - **One UI change only as civilization expands** — a small number in one corner showing how many planets your civilization currently spans (1, 2, 3...)
+- **Investment panel is a 3×3 grid** — 4 field cards on top row, Planet Upgrade and Logistics side by side on bottom row. Logistics card hidden until interplanetary milestone reached. No explanation given when it appears.
 - No dashboards per planet, no panel switching, no complex multi-screen UI
 - Clean, atmospheric, minimal text always
 - **No hints ever** — player learns through failure alone
@@ -325,6 +326,96 @@ The first run is brutal — total darkness, no knowledge, starting from nothing.
 
 ---
 
+## Economics Tightening — Compounding Difficulty
+
+The game must get harder as the civilization expands — not arbitrarily but structurally. Each step of expansion creates compounding complexity that real civilizations have always faced. The economics must reflect this.
+
+**Field cost scaling per planet count:**
+Field costs scale not just with level but with how many planets the civilization spans. Each additional planet adds a compounding cost multiplier to all field investments — because sustaining a field level across two worlds is fundamentally harder than sustaining it across one.
+
+```
+field_cost = base × level_scaling × planet_profile × distance_mult × (1 + 0.3 per additional planet) / logistics_efficiency
+```
+
+**Income scaling slows as civilization grows:**
+More planets does not mean proportionally more income. Real civilizations do not get richer proportionally as they expand — they get more complex. Income scales at 1.4x per planet not 1.8x. The gap between income growth and cost growth widens with every planet. This is intentional. This is how civilizations actually work.
+
+**Filter thresholds increase per planet count:**
+Each filter becomes slightly harder to survive as the civilization spans more worlds. Not dramatically — but noticeably. A 3-planet civilization facing The Plague needs a higher cure threshold than a 1-planet civilization. The crisis is the same. The civilization is more fragile because it is more distributed.
+
+**The compounding stages:**
+
+| Stage | Economic feel |
+|-------|--------------|
+| Planetary | Tight but learnable. Room to build surplus. |
+| Interplanetary | Costs compound noticeably. Logistics unlocks with immediate pressure. Every coin feels spent. |
+| Interstellar | Brutal. Income barely keeps pace with costs. Logistics critical. Almost no room for error. |
+| Intergalactic | Near impossible without perfect play across every prior decision. Almost no one reaches this. Fewer survive it. |
+
+---
+
+## Logistics Field
+
+Logistics is not just a new resource. It is the hidden cost of everything civilization does across distance. Rome did not fall because it ran out of soldiers. It fell because it could not move them fast enough. Every real civilization expansion has failed not from lack of resources but from the inability to move them efficiently.
+
+**When it unlocks:** At interplanetary stage — when the civilization spans 2 or more planets. On a single planet logistics does not exist as a cost. The moment a second world is colonized, logistics unlocks immediately at level 0. There is no warning. The player feels the cost immediately.
+
+**What it does mechanically:**
+Logistics acts as an efficiency multiplier on all field investments across non-home planets. Without logistics investment, every field on an outer planet costs significantly more — because the civilization is effectively shipping everything from the home world. With logistics investment, local production capacity, relay infrastructure, and supply chain efficiency reduce that shipping tax.
+
+```
+effective_field_cost = field_cost × (planet_distance_mult / logistics_efficiency)
+logistics_efficiency = 0.3 + (logistics_level / max_logistics_level) × 0.7
+```
+
+At logistics level 0 — efficiency is 0.3 — all outer planet field costs are multiplied by ~3.3x on top of their existing planet profile. You are shipping rice to Mars at launch-cost prices.
+
+At logistics level max — efficiency approaches 1.0 — costs return toward their planet profile baseline. You have built local supply chains, relay stations, efficient transport. You are not shipping rice to Mars. You are growing it there.
+
+**The floor that logistics cannot cross:**
+Logistics never makes an outer planet cheaper than its natural profile. Europa will always be expensive for food regardless of logistics level — because the environment itself is hostile, not just the supply chain. Logistics removes the shipping tax. It cannot remove the planet's fundamental nature.
+
+**UI placement:** Logistics appears as a rectangular card in the bottom row of the investment panel, beside the Planet Upgrade card. The panel becomes a 3×3 grid — 4 field cards on top, Planet Upgrade and Logistics side by side on the bottom row, same height. Logistics is greyed out and invisible until interplanetary milestone is reached. When it unlocks it appears with no explanation. Player reads what it does through cost changes.
+
+**Why logistics feels real:**
+A bag of saplings to Mars is relatively manageable compared to the same bag to Kepler-452b. The distance multiplies every cost — fuel, time, opportunity cost of cargo space. Rice travelling to Kepler is taking space that could have carried metals, medicine, or another human. Logistics is the field that acknowledges this reality and partially tames it.
+
+---
+
+## Distance Multipliers
+
+Distance is a separate cost layer from planet profile. Planet profile tells you what is hard to sustain there. Distance tells you how expensive it is to get anything there at all. Both compound. Neither can be fully overcome.
+
+**The design constraint:** Distances in reality span 15 orders of magnitude — from Mars at 54 million km to intergalactic scales beyond comprehension. This cannot be literal in game. But it must be felt. The solution is a logarithmic multiplier — the scale is compressed into a 1.0x to 3.5x range. The feeling of scale is preserved. The playability is preserved.
+
+```
+distance_mult = 1.0 + log10(distance_ly × 1000 + 1) × 0.4
+```
+
+**Distance multipliers per planet:**
+
+| Planet | Approx distance | Distance mult | Combined with logistics at max |
+|--------|----------------|--------------|-------------------------------|
+| Earth | reference | 1.0 | 1.0 — home world, no shipping tax |
+| Mars | 0.000015 ly | 1.0 | 1.0 — close enough, logistics fully effective |
+| Europa | 0.000066 ly | 1.05 | ~1.05 |
+| Titan | 0.00013 ly | 1.08 | ~1.08 |
+| Proxima b | 4.2 ly | 1.6 | ~1.3 with max logistics |
+| TRAPPIST-1 | 39 ly | 1.8 | ~1.45 with max logistics |
+| Kepler-452b | 1,400 ly | 2.3 | ~1.7 with max logistics |
+| Unknown-α | unknown | 3.0 | ~2.1 with max logistics — brutal |
+| Unknown-β | unknown | 3.5 | ~2.4 with max logistics — near limit |
+
+**What the player feels not sees:**
+The player never sees a distance number or a multiplier. They see field costs on Kepler being brutal. They understand — not because a tooltip told them — but because they know how far Kepler is. The game told them exactly what humanity knows. The rest is felt through economics. That is the point.
+
+**Distance and logistics together:**
+High distance + low logistics = catastrophic. You are shipping saplings to Kepler on rockets with no supply chain.
+High distance + high logistics = hard but doable. You have relay stations, local production, efficient cargo across light years.
+Distance is never fully overcome. It is only partially tamed. Kepler will always cost more than Mars. That is correct. That is true.
+
+---
+
 ## Solar System Generation
 
 - Each run gets a procedurally generated solar system
@@ -358,9 +449,9 @@ Filter strikes — chaos, watching numbers
 Pass — brief relief, then next timer starts
 New planet — same screen, corner says 2, something feels different
 Numbers draining faster — why? Oh. Two planets now.
+A new card appears in the panel. LOGISTICS. Level 0. No explanation.
+Field costs on the new planet are brutal. Oh. That's what logistics does.
 Filter hits civilization-wide — Earth fine, Mars struggling
-Lose Mars — retreat, grief, Earth alone again
-Build back up — wiser now
 The Great Filter arrives with no warning — darkness — silence
 "THE UNIVERSE DECIDES"
 ...
@@ -387,4 +478,4 @@ The game is epistemologically honest. It gives you exactly what humanity has —
 
 ---
 
-*Document v2.3 — inherited progress system added, loss system clarified. Complete.
+*Document v2.4 — economics tightening, logistics field, distance multipliers added. Complete.
