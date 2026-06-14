@@ -104,6 +104,33 @@ Civilization-wide resources. Always just these four. Never more. Investment pool
 
 ---
 
+## Planet Upgrade System
+
+The planet itself can be upgraded as a separate investment — distinct from the four fields. Upgrading represents terraforming, infrastructure development, industrial capacity — making the world physically more capable of sustaining and growing civilization.
+
+**Base income starts at 8 coins/sec on every planet regardless of field levels.** Field investments modify how income compounds and multiplies internally over time, but the raw per/sec only doubles through deliberate planet upgrades. This gives income a spine — it is a conscious decision not a passive drift.
+
+| Stage | Planet looks like | Cost to upgrade | Per/sec |
+|-------|------------------|----------------|---------|
+| 0 | dim, sparse, barely alive | — | 8/sec |
+| 1 | slightly brighter, early infrastructure visible | 150 coins | 16/sec |
+| 2 | glowing, complex surface patterns | 400 coins | 32/sec |
+| 3 | fully alive, radiant, dense civilization visible | 900 coins | 64/sec |
+| 4 | peak — maximum planetary civilization | 2000 coins | 128/sec |
+
+**Rules:**
+- Planet upgrade resets to stage 0 on every new planet — you are starting from scratch on a new world with no existing infrastructure regardless of how advanced your previous civilization was
+- Upgrade costs are fixed regardless of planet profile — the work of building infrastructure costs the same everywhere. What differs is how much your field costs drain your ability to save for it
+- The visual evolution of the planet is the only indicator of upgrade stage — no number shown, player reads the planet
+- Upgrade button is always visible alongside the four fields — it competes for the same coin pool
+
+**The strategic tension this creates:**
+Upgrade the planet early → better income → stronger field investment → better filter survival, but field levels stay low when early filters arrive. Invest in fields first → survive early filters → but income stays at 8/sec → later filters demand more than weak income can sustain. Neither approach is obviously correct. Both can fail. Both can succeed. The right answer depends on which planet you are on, which filters are coming, and how much surplus you built on the planet before.
+
+**On hostile planets the tension is explicit:** On Mars, 8/sec with expensive Food and Energy costs means every coin is spoken for. Saving 150 coins for a stage 1 upgrade while also needing Science and Energy invested before the Plague arrives is a real civilizational choice that has no clean answer. That pressure is intentional. That is what it would actually feel like.
+
+---
+
 ## Planet Cost Profiles
 
 Each planet has natural conditions that make certain fields cheaper or more expensive. This is **never shown as numbers** — communicated purely through visual environmental cues (atmosphere color, soil texture, terrain type). Player reads the environment and adapts or fails.
@@ -223,7 +250,7 @@ No filter is static. Each tests a combination of fields in ways that punish tunn
 ```
 Spawn on first habitable planet in procedurally generated solar system
                     ↓
-         Invest in 4 fields, survive filters
+   Invest in 4 fields + upgrade planet to grow income
                     ↓
           Win all 6 filters including The Great Filter
                     ↓
@@ -255,22 +282,46 @@ Spawn on first habitable planet in procedurally generated solar system
 ## Loss System & Irreversibility
 
 **During single planet phase:**
-- Fail any filter → that planet is gone, civilization extinct there, irreversible
-- Another habitable planet exists in solar system → move there, fresh start on new planet, lost planet banned for this run only (available again next run)
-- No other habitable planets → **full game over, run ends**
-- Lose starting planet with no other habitable planets available → immediate game over, no fallback
+- Fail any filter → full game over, run ends immediately
+- No fallback to another planet — the civilization had one world and lost it
+- Milestone is recorded — if this was the first planet, no inheritance. Next run starts from scratch.
 
 **During multi-planet phase:**
-- Fail any filter → the civilization cannot sustain one of its planets through the crisis
-- The weakest planet profile collapses — that planet is lost
-- If only one planet remains → back to single planet phase, continue
-- Lose the last planet → **full game over, run ends**
-- Lose while interplanetary/interstellar → **full game over, begin again**
+- Fail any filter → full game over, run ends immediately
+- The filter is civilization-wide — failing it means the entire civilization failed, not just one planet
+- No retreat to base planet — a civilization that couldn't survive the Plague couldn't survive it anywhere
+- Milestone is recorded before run ends — next run inherits the progress reached
 
 **The irreversibility rule:**
 - All investment decisions permanent within a run — no reallocation ever
 - The player who spammed one field and died to the filter that punished it earned that death
 - No second chances on the same planet in the same run
+- **Fail any filter at any stage = game over, full stop.** No retreat. No fallback within a run. The filter is civilization-wide — if the civilization failed it, it failed everywhere simultaneously. A civilization that couldn't cure the Plague on Mars also couldn't cure it on Earth. The disease does not respect which planet you colonized first.
+
+---
+
+## Inherited Progress
+
+Civilizations fall. But knowledge doesn't vanish entirely. The next attempt builds on what the last one reached. This is not a second chance — it is inherited progress. That is different. And it is true. Knowledge compounds even when civilizations fall.
+
+**Milestone system — next run starts at the highest stage previously reached:**
+
+| Milestone reached in previous run | Next run starts at |
+|----------------------------------|-------------------|
+| Never left first planet | Start at Earth, solar system 1, no inheritance |
+| Reached interplanetary (2+ planets) | Start with 2 planets already colonized |
+| Reached interstellar (new solar system) | Start at solar system 2 |
+| Reached intergalactic | Start at solar system 3+ |
+
+**Rules:**
+- Milestone is saved permanently — survives across all runs
+- Starting further does not mean starting easier — filters still arrive with full force, field levels still start at zero, planet stage still starts at 0
+- The inheritance is position only — the next civilization starts where the last one reached, not with what the last one had
+- A player who reached interstellar and keeps dying at interstellar still starts at interstellar — they are not pushed back
+- Intergalactic milestone is the only one that cannot be inherited further — if you reached it once you start there every run after
+
+**Why this feels right:**
+The first run is brutal — total darkness, no knowledge, starting from nothing. Each run the player starts slightly further into the unknown. Long term, players slowly push the frontier run by run. The universe doesn't get easier. The player just begins closer to where it gets hard.
 
 ---
 
@@ -336,4 +387,4 @@ The game is epistemologically honest. It gives you exactly what humanity has —
 
 ---
 
-*Document v2.1 — complete. No gaps. Ready to build.*
+*Document v2.3 — inherited progress system added, loss system clarified. Complete.
