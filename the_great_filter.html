@@ -1293,7 +1293,7 @@ function initGameState() {
   // More advanced milestone = slightly more starting capital
   const startCoins = {
     planetary:      100,
-    interplanetary: 200, // managing 2 worlds already, more infrastructure
+    interplanetary: 250, // managing 2 worlds — Mars hostility demands more starting capital
     interstellar:   300, // interstellar civilization, more resources
     intergalactic:  400, // intergalactic civilization
   }[milestone] || 100;
@@ -1364,8 +1364,8 @@ function getFieldCost(fieldKey) {
   const planets = G.currentPlanets;
   const n = planets.length;
 
-  // GDD: Science is planet-neutral — same cost regardless of planet or distance
-  // But still compounds with planet count (more worlds = more research distributed)
+  // GDD: Science is planet-neutral — civilization-wide research pool
+  // Compounds slightly with planet count (research distributed across more worlds)
   if (fieldKey === 'science') {
     const planetCountMult = 1 + (n - 1) * 0.2;
     return Math.round(f.baseCost * (1 + f.level * 0.5) * planetCountMult);
@@ -1373,29 +1373,26 @@ function getFieldCost(fieldKey) {
 
   const multKey = { food: 'foodMult', energy: 'energyMult', society: 'socMult' }[fieldKey];
 
-  // Average planet profile mult across all planets
+  // Average planet profile — Mars is expensive for food because Mars has no soil
   const avgProfileMult = planets.reduce((a, p) => a + p[multKey], 0) / n;
 
-  // GDD: distance multiplier — log-compressed, felt through costs not shown
-  // Average distance of all non-home planets (home = Earth, always index 0)
-  let avgDistMult = 1.0;
+  // GDD planet count compounding — sustaining a field level across more worlds is harder
+  const planetCountMult = 1 + (n - 1) * 0.25;
+
+  // GDD: DISTANCE shipping tax — only the EXCESS above 1.0 is reduced by logistics
+  // Sol system planets (Mars, Europa, Titan): dist_mult ≈ 1.0 → logistics barely matters
+  // Kepler, Proxima, TRAPPIST: dist_mult 1.6-3.5 → logistics is critical
+  // This is philosophically correct: logistics solves DISTANCE not planet hostility
+  let shippingTax = 1.0;
   if (n > 1) {
     const outerDists = planets.slice(1).map(p => getDistanceMult(p));
-    avgDistMult = outerDists.reduce((a,b) => a+b, 0) / outerDists.length;
+    const avgDistMult = outerDists.reduce((a,b) => a+b, 0) / outerDists.length;
+    const logEff = getLogisticsEfficiency();
+    // Only the distance EXCESS (above 1.0) is tamed by logistics
+    shippingTax = 1.0 + (avgDistMult - 1.0) / logEff;
   }
 
-  // GDD: logistics efficiency reduces the distance shipping tax
-  // On single planet logistics has no effect (efficiency = 1.0)
-  const logEff = getLogisticsEfficiency();
-
-  // GDD: planet count compounding — each additional planet makes all fields harder
-  const planetCountMult = 1 + (n - 1) * 0.3;
-
-  // Final cost formula:
-  // base × level_scaling × planet_profile × (distance_mult / logistics_eff) × planet_count_compound
-  const distLogisticsMult = n > 1 ? (avgDistMult / logEff) : 1.0;
-
-  return Math.round(f.baseCost * (1 + f.level * 0.5) * avgProfileMult * distLogisticsMult * planetCountMult);
+  return Math.round(f.baseCost * (1 + f.level * 0.5) * avgProfileMult * shippingTax * planetCountMult);
 }
 
 // ═══════════════════════════════════════════
