@@ -816,6 +816,7 @@ function initGameState() {
     solarSystemNum: 1,
     tick: 0,
     planetHealth: 1.0, // 0-1, visual only
+    planetStage: 0,    // 0-4, upgrade stage — resets on new planet
     glitching: false,
     planetCracked: false,  // visual: cracks on fail
     planetGlowing: false,  // visual: glows bright on pass
@@ -827,22 +828,42 @@ function initGameState() {
 function updateIncomeRate() {
   const f = G.fields;
   const planets = G.currentPlanets;
-  // GDD: Food feeds population -> drives coin income
-  const foodBase = f.food.level * 2.5;
+  // GDD: base income = 8/sec * 2^planetStage — only planet upgrades double per/sec
+  const stageBase = 8 * Math.pow(2, G.planetStage);
+  // GDD: Food feeds population -> multiplies base income
+  const foodMult = 1 + (f.food.level * 0.12);
   // GDD: Energy powers infrastructure -> boosts Science effectiveness
-  const energyBoost = 1 + (f.energy.level * 0.08);
+  const energyBoost = 1 + (f.energy.level * 0.06);
   // GDD: Science multiplies all field effectiveness (compounded by Energy)
-  const sciMult = 1 + (f.science.level * 0.06 * energyBoost);
+  const sciMult = 1 + (f.science.level * 0.05 * energyBoost);
   // GDD: Society reduces drain -> adds stability bonus
-  const socBonus = f.society.level * 1.2;
-  // Base: Food drives it, Science multiplies, Society stabilizes
-  const base = (10 + foodBase + socBonus) * sciMult;
-  // GDD: each planet roughly doubles income
+  const socBonus = 1 + (f.society.level * 0.04);
+  // Combined field multiplier on top of stage base
+  const fieldMult = foodMult * sciMult * socBonus;
+  // More planets = civilization-wide income scales
   const planetMult = Math.pow(1.8, planets.length - 1);
   // Hostile planets drain income efficiency
   const avgHostility = planets.reduce((a,p) => a + (p.foodMult + p.energyMult) / 2, 0) / planets.length;
   const hostilityDrain = avgHostility * 0.45 + 0.55;
-  G.coinsPerSec = Math.max(1, Math.round((base * planetMult) / hostilityDrain));
+  G.coinsPerSec = Math.max(1, Math.round((stageBase * fieldMult * planetMult) / hostilityDrain));
+}
+
+const PLANET_UPGRADE_COSTS = [150, 400, 900, 2000]; // cost to go from stage 0→1, 1→2, 2→3, 3→4
+
+function getPlanetUpgradeCost() {
+  if (G.planetStage >= 4) return null; // max stage
+  return PLANET_UPGRADE_COSTS[G.planetStage];
+}
+
+function upgradePlanet() {
+  const cost = getPlanetUpgradeCost();
+  if (!cost || G.coins < cost) return;
+  sfxInvest();
+  G.coins -= cost;
+  G.planetStage++;
+  updateIncomeRate();
+  renderPanel();
+  updateHUD();
 }
 
 function getFieldCost(fieldKey) {
@@ -881,6 +902,41 @@ function renderPanel() {
     `;
     grid.appendChild(card);
   });
+
+  // Planet upgrade card
+  const upgradeCost = getPlanetUpgradeCost();
+  const stageNames = ['BARREN', 'SETTLING', 'GROWING', 'THRIVING', 'PEAK'];
+  const upgradeCard = document.createElement('div');
+  upgradeCard.className = 'field-card';
+  upgradeCard.style.borderColor = upgradeCost && G.coins >= upgradeCost ? '#F5A623' : '';
+  upgradeCard.style.gridColumn = '1 / -1'; // full width
+  upgradeCard.style.flexDirection = 'row';
+  upgradeCard.style.alignItems = 'center';
+  upgradeCard.style.gap = '16px';
+  upgradeCard.style.padding = '10px 14px';
+
+  // Stage dots
+  const dots = Array.from({length: 5}, (_,i) =>
+    `<span style="color:${i <= G.planetStage ? '#F5A623' : '#2A2A50'};font-size:10px;">●</span>`
+  ).join(' ');
+
+  upgradeCard.innerHTML = `
+    <div style="font-size:18px">🪐</div>
+    <div style="flex:1;">
+      <div class="field-name">PLANET — ${stageNames[G.planetStage]}</div>
+      <div style="margin-top:4px;">${dots}</div>
+      <div class="field-cost" style="margin-top:4px;">BASE INCOME: ${8 * Math.pow(2, G.planetStage)}/SEC</div>
+    </div>
+    ${upgradeCost
+      ? `<button class="invest-btn" style="width:auto;padding:8px 16px;white-space:nowrap;"
+           ${G.coins >= upgradeCost ? '' : 'disabled'}
+           onclick="upgradePlanet()">
+           UPGRADE — ${upgradeCost} 💰
+         </button>`
+      : `<div class="field-name" style="color:#39FF14;">MAX</div>`
+    }
+  `;
+  grid.appendChild(upgradeCard);
 }
 
 
@@ -1084,6 +1140,7 @@ function showExtinctionWithFallback(planet, filter) {
   // Move to next planet in system pool
   const nextPlanet = G.systemPool.shift();
   G.currentPlanets = [nextPlanet];
+  G.planetStage = 0; // GDD: resets on every new planet — starting from scratch
   G.phase = 'move';
 
   document.getElementById('move-text').innerHTML =
@@ -1212,6 +1269,7 @@ function continueAfterWin() {
 
   if (nextPlanet) {
     G.totalPlanetsEver++;
+    G.planetStage = 0; // GDD: resets on every new planet
     G.currentWave = 0;
     G.filterTimeLeft = FILTERS[0].timer;
     G.filterActive = false;
@@ -1285,12 +1343,14 @@ function drawPlanets(ts) {
     const px = cx + Math.cos(angle) * orbitR;
     const py = cy + Math.sin(angle) * orbitR;
     const pr = planets.length === 1 ? 55 : 35 - i * 3;
+    // Stage affects glow intensity — more developed = more radiant
+    const stageGlow = i === planets.length - 1 ? (1 + G.planetStage * 0.3) : 1.0;
 
     // Pulse
     const pulse = Math.sin(ts * 0.001 + i) * 3;
 
     // Glow — brighter on pass, red on fail
-    const glowIntensity = G.planetGlowing ? 2.5 : G.planetCracked ? 0.3 : 1.0;
+    const glowIntensity = G.planetGlowing ? 2.5 : G.planetCracked ? 0.3 : stageGlow;
     const glowCol = G.planetGlowing ? '#39FF14' : G.planetCracked ? '#FF3131' : planet.glowColor;
     const glowSize = pr + 20 + pulse;
     const glow = ctx.createRadialGradient(px, py, pr * 0.5, px, py, glowSize * glowIntensity);
