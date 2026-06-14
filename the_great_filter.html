@@ -718,7 +718,7 @@ const FILTERS = [
       const socPolicy  = Math.min(f.society.level, cap) / cap * 0.35;
       const planetLoad = planets.reduce((a,p) => a + p.energyMult, 0) / planets.length;
       const score      = (avg / cap) * 0.25 + sciSol + socPolicy - enDmg - foodDmg - (planetLoad - 1) * 0.08;
-      return score > 0.38;
+      return score > 0.30;
     }
   },
   {
@@ -781,9 +781,13 @@ const FILTERS = [
       const max = Math.max(...fields);
       const balance = min / Math.max(max, 1);
       // Survival probability
+      // GDD: rewards strategy not perfection
+      // balance>0.5 = well-rounded civ = 90% chance
+      // balance>0.3 = somewhat balanced = 60% chance
+      // else = tunnel vision = 20% chance
       let prob;
-      if (balance > 0.7 && ratio > 0.5) prob = 0.90;
-      else if (balance > 0.5 && ratio > 0.35) prob = 0.60;
+      if (balance > 0.5 && ratio > 0.4) prob = 0.90;
+      else if (balance > 0.3 && ratio > 0.25) prob = 0.60;
       else prob = 0.20;
       return Math.random() < prob;
     }
@@ -887,11 +891,20 @@ function initGameState() {
     futurePool = availablePlanets;
   }
 
+  // GDD: fields always reset — position inherited, not resources
+  // Starting coins reflect inherited civilization knowledge
+  // More advanced milestone = slightly more starting capital
+  const startCoins = {
+    planetary:      100,
+    interplanetary: 200, // managing 2 worlds already, more infrastructure
+    interstellar:   300, // interstellar civilization, more resources
+    intergalactic:  400, // intergalactic civilization
+  }[milestone] || 100;
+
   G = {
     phase: 'playing',
-    // GDD: fields always reset — position inherited, not resources
-    coins: 80,
-    coinsPerSec: 8, // recalculated by updateIncomeRate()
+    coins: startCoins,
+    coinsPerSec: 10, // recalculated by updateIncomeRate()
     fields: freshFields(),
     currentPlanets: startingPlanets,
     systemPool,
@@ -917,7 +930,7 @@ function updateIncomeRate() {
   const planets = G.currentPlanets;
   // GDD: ONLY planet stage doubles per/sec — fields do not affect income
   // 8 * 2^stage = 8, 16, 32, 64, 128
-  const stageBase = 8 * Math.pow(2, G.planetStage);
+  const stageBase = 10 * Math.pow(2, G.planetStage);
   // More planets = civilization spans more worlds = more income
   const planetMult = Math.pow(1.8, planets.length - 1);
   // Hostile planets drain efficiency slightly
@@ -926,7 +939,11 @@ function updateIncomeRate() {
   G.coinsPerSec = Math.max(1, Math.round((stageBase * planetMult) / hostilityDrain));
 }
 
-const PLANET_UPGRADE_COSTS = [150, 400, 900, 2000]; // cost to go from stage 0→1, 1→2, 2→3, 3→4
+// Stage 0→1: 80 — accessible after War window, creates early decision
+// Stage 1→2: 300 — meaningful mid-game investment
+// Stage 2→3: 700 — late-game commitment
+// Stage 3→4: 1800 — endgame, only with heavy income
+const PLANET_UPGRADE_COSTS = [80, 300, 700, 1800];
 
 function getPlanetUpgradeCost() {
   if (G.planetStage >= 4) return null; // max stage
@@ -1003,7 +1020,7 @@ function renderPanel() {
     <div style="flex:1;">
       <div class="field-name">PLANET — ${stageNames[G.planetStage]}</div>
       <div style="margin-top:4px;">${dots}</div>
-      <div class="field-cost" style="margin-top:4px; color: var(--dim);">NEXT: ${8 * Math.pow(2, G.planetStage + 1)}/SEC</div>
+      <div class="field-cost" style="margin-top:4px; color: var(--dim);">UPGRADE → ${10 * Math.pow(2, G.planetStage + 1)}/SEC</div>
     </div>
     ${upgradeCost
       ? `<button class="invest-btn" style="width:auto;padding:8px 16px;white-space:nowrap;"
