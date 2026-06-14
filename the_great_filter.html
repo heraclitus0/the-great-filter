@@ -438,9 +438,9 @@
   /* PLANET INFO */
   #planet-info {
     position: fixed;
-    top: 50%;
+    top: 60px;
     left: 50%;
-    transform: translate(-50%, -120px);
+    transform: translateX(-50%);
     text-align: center;
     z-index: 12;
     pointer-events: none;
@@ -607,6 +607,45 @@ function initStars() {
 }
 
 // ═══════════════════════════════════════════
+// MILESTONE / INHERITED PROGRESS SYSTEM
+// ═══════════════════════════════════════════
+// GDD: knowledge compounds even when civilizations fall.
+// Next run starts at highest milestone previously reached.
+// Position only — fields reset to 0, coins reset, planet stage resets.
+
+const MILESTONE_KEYS = {
+  PLANETARY:      'tgf_milestone_planetary',      // reached planet 1 (always true after first run)
+  INTERPLANETARY: 'tgf_milestone_interplanetary', // reached 2+ planets same system
+  INTERSTELLAR:   'tgf_milestone_interstellar',   // reached a new solar system
+  INTERGALACTIC:  'tgf_milestone_intergalactic',  // reached intergalactic
+};
+
+function getMilestone() {
+  if (localStorage.getItem(MILESTONE_KEYS.INTERGALACTIC)) return 'intergalactic';
+  if (localStorage.getItem(MILESTONE_KEYS.INTERSTELLAR))  return 'interstellar';
+  if (localStorage.getItem(MILESTONE_KEYS.INTERPLANETARY)) return 'interplanetary';
+  return 'planetary';
+}
+
+function saveMilestone(key) {
+  // Only upgrade milestone, never downgrade
+  const order = ['planetary', 'interplanetary', 'interstellar', 'intergalactic'];
+  const current = getMilestone();
+  const newLevel = { planetary: 0, interplanetary: 1, interstellar: 2, intergalactic: 3 }[key];
+  const currentLevel = order.indexOf(current);
+  if (newLevel > currentLevel) {
+    localStorage.setItem(MILESTONE_KEYS[key.toUpperCase()], '1');
+  }
+}
+
+function getStartingCondition() {
+  // GDD: starting position inherited from highest milestone
+  // Fields always reset to 0. Coins always reset. Only position inherited.
+  const milestone = getMilestone();
+  return milestone;
+}
+
+// ═══════════════════════════════════════════
 // GAME STATE
 // ═══════════════════════════════════════════
 const FILTERS = [
@@ -769,8 +808,31 @@ const PLANETS = [
 
 let G = {}; // game state
 
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function buildSolarSystem(availablePlanets, count) {
+  // Draw 'count' planets from available pool for this system
+  const sysCount = Math.min(count, availablePlanets.length);
+  return availablePlanets.splice(0, sysCount);
+}
+
+function freshFields() {
+  return {
+    food:    { level: 0, emoji: "🌾", name: "FOOD",    baseCost: 10 },
+    energy:  { level: 0, emoji: "⚡", name: "ENERGY",  baseCost: 10 },
+    science: { level: 0, emoji: "🔬", name: "SCIENCE", baseCost: 10 },
+    society: { level: 0, emoji: "🤝", name: "SOCIETY", baseCost: 10 },
+  };
+}
+
 function initGameState() {
-  // Randomize Great Filter weights
+  // Randomize Great Filter weights each run
   window._gfWeights = [
     Math.random() * 0.4 + 0.1,
     Math.random() * 0.4 + 0.1,
@@ -778,74 +840,90 @@ function initGameState() {
     Math.random() * 0.4 + 0.1,
   ];
 
-  // Pick starting planet (always Earth first)
-  const availablePlanets = [...PLANETS];
-  const earthIdx = availablePlanets.findIndex(p => p.name === "EARTH");
-  const earth = availablePlanets.splice(earthIdx, 1)[0];
+  // Build planet pool — Earth always available
+  const availablePlanets = shuffle([...PLANETS].filter(p => p.name !== "EARTH"));
+  const earth = PLANETS.find(p => p.name === "EARTH");
 
-  // Shuffle remaining
-  for (let i = availablePlanets.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [availablePlanets[i], availablePlanets[j]] = [availablePlanets[j], availablePlanets[i]];
+  // GDD: inherited progress — start at highest milestone reached
+  const milestone = getMilestone();
+
+  let startingPlanets = [earth];
+  let systemPool = [];
+  let futurePool = [];
+  let solarSystemNum = 1;
+  let totalPlanetsEver = 1;
+
+  if (milestone === 'planetary') {
+    // First time or never left Earth — start at Earth
+    systemPool = buildSolarSystem(availablePlanets, Math.floor(Math.random() * 3) + 1);
+    futurePool = availablePlanets;
   }
-
-  // Current solar system gets 1-3 additional habitable planets
-  const sysCount = Math.floor(Math.random() * 3) + 1;
-  const currentSystemPool = availablePlanets.splice(0, sysCount);
-  const futurePool = availablePlanets;
+  else if (milestone === 'interplanetary') {
+    // Reached 2+ planets before — start with Earth + 1 already colonized
+    const secondPlanet = availablePlanets.shift();
+    startingPlanets = [earth, secondPlanet];
+    totalPlanetsEver = 2;
+    systemPool = buildSolarSystem(availablePlanets, Math.floor(Math.random() * 2) + 1);
+    futurePool = availablePlanets;
+  }
+  else if (milestone === 'interstellar') {
+    // Reached a new solar system — start at system 2
+    solarSystemNum = 2;
+    // First system planets gone — start in new system
+    const newSystemPlanets = availablePlanets.splice(0, Math.floor(Math.random() * 3) + 2);
+    startingPlanets = [newSystemPlanets.shift()];
+    totalPlanetsEver = 4; // approximate
+    systemPool = newSystemPlanets;
+    futurePool = availablePlanets;
+  }
+  else if (milestone === 'intergalactic') {
+    // Furthest milestone — start at system 3
+    solarSystemNum = 3;
+    availablePlanets.splice(0, 5); // skip earlier systems
+    const newSystemPlanets = availablePlanets.splice(0, Math.floor(Math.random() * 3) + 2);
+    startingPlanets = [newSystemPlanets.shift()];
+    totalPlanetsEver = 8;
+    systemPool = newSystemPlanets;
+    futurePool = availablePlanets;
+  }
 
   G = {
     phase: 'playing',
-    coins: 80,         // enough for 2 immediate investments before plague
-    coinsPerSec: 10,   // recalculated immediately by updateIncomeRate()
-    fields: {
-      food:    { level: 0, emoji: "🌾", name: "FOOD",    baseCost: 10 },
-      energy:  { level: 0, emoji: "⚡", name: "ENERGY",  baseCost: 10 },
-      science: { level: 0, emoji: "🔬", name: "SCIENCE", baseCost: 10 },
-      society: { level: 0, emoji: "🤝", name: "SOCIETY", baseCost: 10 },
-    },
-    currentPlanets: [earth],
-    systemPool: currentSystemPool,
-    futurePool: futurePool,
+    // GDD: fields always reset — position inherited, not resources
+    coins: 80,
+    coinsPerSec: 8, // recalculated by updateIncomeRate()
+    fields: freshFields(),
+    currentPlanets: startingPlanets,
+    systemPool,
+    futurePool,
     bannedThisRun: [],
-    currentWave: 0, // 0-indexed, so filter[0] = plague
+    currentWave: 0,
     filterActive: false,
     filterTimeLeft: FILTERS[0].timer,
     warningShown: false,
-    totalPlanetsEver: 1,
-    solarSystemNum: 1,
-    tick: 0,
-    planetHealth: 1.0, // 0-1, visual only
-    planetStage: 0,    // 0-4, upgrade stage — resets on new planet
+    totalPlanetsEver,
+    solarSystemNum,
+    planetStage: 0,    // always resets
     glitching: false,
-    planetCracked: false,  // visual: cracks on fail
-    planetGlowing: false,  // visual: glows bright on pass
+    planetCracked: false,
+    planetGlowing: false,
+    milestone,         // track what milestone started this run
   };
 
   updateIncomeRate();
 }
 
 function updateIncomeRate() {
-  const f = G.fields;
   const planets = G.currentPlanets;
-  // GDD: base income = 8/sec * 2^planetStage — only planet upgrades double per/sec
+  // GDD: ONLY planet stage doubles per/sec — fields do not affect income
+  // 8 * 2^stage = 8, 16, 32, 64, 128
   const stageBase = 8 * Math.pow(2, G.planetStage);
-  // GDD: Food feeds population -> multiplies base income
-  const foodMult = 1 + (f.food.level * 0.12);
-  // GDD: Energy powers infrastructure -> boosts Science effectiveness
-  const energyBoost = 1 + (f.energy.level * 0.06);
-  // GDD: Science multiplies all field effectiveness (compounded by Energy)
-  const sciMult = 1 + (f.science.level * 0.05 * energyBoost);
-  // GDD: Society reduces drain -> adds stability bonus
-  const socBonus = 1 + (f.society.level * 0.04);
-  // Combined field multiplier on top of stage base
-  const fieldMult = foodMult * sciMult * socBonus;
-  // More planets = civilization-wide income scales
+  // More planets = civilization spans more worlds = more income
   const planetMult = Math.pow(1.8, planets.length - 1);
-  // Hostile planets drain income efficiency
+  // Hostile planets drain efficiency slightly
   const avgHostility = planets.reduce((a,p) => a + (p.foodMult + p.energyMult) / 2, 0) / planets.length;
-  const hostilityDrain = avgHostility * 0.45 + 0.55;
-  G.coinsPerSec = Math.max(1, Math.round((stageBase * fieldMult * planetMult) / hostilityDrain));
+  const hostilityDrain = avgHostility * 0.4 + 0.6;
+  G.coinsPerSec = Math.max(1, Math.round((stageBase * planetMult) / hostilityDrain));
 }
 
 const PLANET_UPGRADE_COSTS = [150, 400, 900, 2000]; // cost to go from stage 0→1, 1→2, 2→3, 3→4
@@ -925,7 +1003,7 @@ function renderPanel() {
     <div style="flex:1;">
       <div class="field-name">PLANET — ${stageNames[G.planetStage]}</div>
       <div style="margin-top:4px;">${dots}</div>
-      <div class="field-cost" style="margin-top:4px;">BASE INCOME: ${8 * Math.pow(2, G.planetStage)}/SEC</div>
+      <div class="field-cost" style="margin-top:4px; color: var(--dim);">NEXT: ${8 * Math.pow(2, G.planetStage + 1)}/SEC</div>
     </div>
     ${upgradeCost
       ? `<button class="invest-btn" style="width:auto;padding:8px 16px;white-space:nowrap;"
@@ -960,6 +1038,10 @@ function updateHUD() {
   document.getElementById('planet-count-display').textContent = `● ${G.currentPlanets.length} PLANET${G.currentPlanets.length > 1 ? 'S' : ''}`;
   document.getElementById('wave-display').textContent = `${G.currentWave + 1} / 6`;
   document.getElementById('system-display').textContent = `SYSTEM ${G.solarSystemNum}`;
+
+  // Show current civilization stage in HUD
+  const stageLabels = { planetary: 'PLANETARY', interplanetary: 'INTERPLANETARY', interstellar: 'INTERSTELLAR', intergalactic: 'INTERGALACTIC' };
+  const currentStage = G.solarSystemNum >= 3 ? 'intergalactic' : G.solarSystemNum >= 2 ? 'interstellar' : G.currentPlanets.length >= 2 ? 'interplanetary' : 'planetary';
 
   // Planet name
   const cp = G.currentPlanets[G.currentPlanets.length - 1];
@@ -1117,66 +1199,52 @@ function resolveFilterPass(waveIdx) {
 
 function resolveFilterFail(filter) {
   document.getElementById('filter-overlay').classList.add('hidden');
-
-  // GDD: Lose while interplanetary/interstellar = full game over
-  // Only single-planet failure allows fallback to another planet in system
-  if (G.currentPlanets.length > 1) {
-    // Interplanetary — civilization collapses entirely
-    showGameOver(filter);
-  } else if (G.systemPool.length > 0) {
-    // Single planet — species flees to next habitable planet in system
-    const lost = G.currentPlanets[0];
-    G.bannedThisRun.push(lost.name);
-    showExtinctionWithFallback(lost, filter);
-  } else {
-    // No fallback — full extinction
-    showGameOver(filter);
-  }
+  // GDD: fail any filter at any stage = game over, full stop.
+  // Filters are civilization-wide. The civilization failed. All of it.
+  // Save milestone before ending — next run inherits position.
+  recordMilestoneFromCurrentState();
+  showGameOver(filter);
 }
 
-// showPlanetLost removed — multi-planet loss = full game over per GDD
-
-function showExtinctionWithFallback(planet, filter) {
-  // Move to next planet in system pool
-  const nextPlanet = G.systemPool.shift();
-  G.currentPlanets = [nextPlanet];
-  G.planetStage = 0; // GDD: resets on every new planet — starting from scratch
-  G.phase = 'move';
-
-  document.getElementById('move-text').innerHTML =
-    `${planet.name} IS LOST TO ${filter.emoji} ${filter.name}.<br><br>` +
-    `YOUR SPECIES FLED TO ${nextPlanet.name}.<br><br>` +
-    `${nextPlanet.known ? 'YOU KNOW THIS PLACE FROM OBSERVATION.' : 'THIS WORLD IS LARGELY UNKNOWN TO YOU.'}<br><br>` +
-    `BUILD CAREFULLY. THERE IS NO MORE GOING BACK.`;
-
-  document.getElementById('move-screen').classList.remove('hidden');
-  document.getElementById('move-screen').querySelector('button').onclick = () => {
-    document.getElementById('move-screen').classList.add('hidden');
-    G.filterActive = false;
-    G.currentWave = 0; // Reset waves on new planet
-    G.filterTimeLeft = FILTERS[0].timer;
-    G.phase = 'playing';
-    updateIncomeRate();
-    document.getElementById('invest-panel').classList.remove('hidden');
-    document.getElementById('hud').classList.remove('hidden');
-    document.getElementById('planet-info').classList.remove('hidden');
-    document.getElementById('surplus-bar').classList.remove('hidden');
-    renderPanel();
-    updateHUD();
-  };
+function recordMilestoneFromCurrentState() {
+  // Determine highest milestone reached this run and save it
+  if (G.solarSystemNum >= 3) {
+    saveMilestone('intergalactic');
+  } else if (G.solarSystemNum >= 2) {
+    saveMilestone('interstellar');
+  } else if (G.currentPlanets.length >= 2 || G.totalPlanetsEver >= 2) {
+    saveMilestone('interplanetary');
+  } else {
+    saveMilestone('planetary');
+  }
 }
 
 function showGameOver(filter) {
   G.phase = 'gameover';
   document.getElementById('gameover-screen').classList.remove('hidden');
   document.getElementById('extinction-title').textContent = 'EXTINCTION';
-  const interplanetary = G.currentPlanets.length > 1;
+
+  const milestone = getMilestone();
+  const inheritMap = {
+    planetary:      'NEXT RUN BEGINS AT EARTH.',
+    interplanetary: 'NEXT RUN BEGINS WITH TWO WORLDS ALREADY COLONIZED.',
+    interstellar:   'NEXT RUN BEGINS IN A NEW SOLAR SYSTEM.',
+    intergalactic:  'NEXT RUN BEGINS BEYOND THE STARS.',
+  };
+  const inheritMsg = inheritMap[milestone] || 'NEXT RUN BEGINS AT EARTH.';
+  const stageLabel = {
+    planetary: 'PLANETARY',
+    interplanetary: 'INTERPLANETARY',
+    interstellar: 'INTERSTELLAR',
+    intergalactic: 'INTERGALACTIC',
+  }[milestone];
+
   document.getElementById('cause-text').innerHTML =
     `YOUR CIVILIZATION FELL TO<br>${filter.emoji} ${filter.name}.<br><br>` +
-    (interplanetary ? `YOUR INTERPLANETARY CIVILIZATION COLLAPSED.<br><br>` : '') +
-    `PLANETS REACHED: ${G.totalPlanetsEver}<br>` +
-    `FILTERS SURVIVED: ${G.currentWave}<br><br>` +
-    `THE UNIVERSE DOES NOT REMEMBER YOU.`;
+    `PLANETS REACHED: ${G.totalPlanetsEver} &nbsp;|&nbsp; FILTERS SURVIVED: ${G.currentWave}<br>` +
+    `STAGE: ${stageLabel}<br><br>` +
+    `<span style="color:#F5A623;">${inheritMsg}</span><br><br>` +
+    `THE UNIVERSE DOES NOT REMEMBER YOU.<br>BUT YOUR SPECIES REMEMBERS THE WAY.`;
 }
 
 // ═══════════════════════════════════════════
@@ -1221,6 +1289,7 @@ function triggerGreatFilter() {
         verdict.style.textShadow = '0 0 30px #39FF14';
         setTimeout(() => {
           gfScreen.classList.add('hidden');
+          recordMilestoneFromCurrentState();
           showWin();
         }, 3000);
       } else {
@@ -1229,6 +1298,9 @@ function triggerGreatFilter() {
         verdict.style.textShadow = '0 0 30px #FF3131';
         setTimeout(() => {
           gfScreen.classList.add('hidden');
+          // Record milestone — survived all 5 filters but fell to The Great Filter
+          // Still counts as interplanetary/interstellar if reached
+          recordMilestoneFromCurrentState();
           showGameOver(FILTERS[5]);
         }, 3000);
       }
@@ -1271,6 +1343,8 @@ function continueAfterWin() {
     G.totalPlanetsEver++;
     G.planetStage = 0; // GDD: resets on every new planet
     G.currentWave = 0;
+    // Record milestone as civilization expands
+    recordMilestoneFromCurrentState();
     G.filterTimeLeft = FILTERS[0].timer;
     G.filterActive = false;
     G.phase = 'playing';
@@ -1388,16 +1462,15 @@ function drawPlanets(ts) {
       ctx.globalAlpha = 1;
     }
 
-    // Pixel texture overlay
-    ctx.globalAlpha = 0.15;
-    for (let px2 = -pr; px2 < pr; px2 += 4) {
-      for (let py2 = -pr; py2 < pr; py2 += 4) {
-        if (px2*px2 + py2*py2 < pr*pr) {
-          if (Math.random() < 0.3) {
-            ctx.fillStyle = '#000';
-            ctx.fillRect(px + px2, py + py2, 3, 3);
-          }
-        }
+    // Pixel texture — seeded per planet index, not random per frame
+    ctx.globalAlpha = 0.12;
+    const seed = i * 1000;
+    for (let t2 = 0; t2 < 40; t2++) {
+      const sx = Math.sin(seed + t2 * 7.3) * pr * 0.85;
+      const sy = Math.cos(seed + t2 * 5.1) * pr * 0.85;
+      if (sx*sx + sy*sy < pr*pr * 0.9) {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(px + sx, py + sy, 3, 3);
       }
     }
     ctx.globalAlpha = 1;
@@ -1431,7 +1504,6 @@ function drawPlanets(ts) {
 // ═══════════════════════════════════════════
 function startGame() {
   stopTitleMusic();
-  // Also hard-close audioCtx so no music bleeds into gameplay
   setTimeout(() => {
     if (audioCtx) { try { audioCtx.close(); } catch(e){} audioCtx = null; }
   }, 600);
@@ -1441,6 +1513,30 @@ function startGame() {
   document.getElementById('invest-panel').classList.remove('hidden');
   document.getElementById('planet-info').classList.remove('hidden');
   document.getElementById('surplus-bar').classList.remove('hidden');
+
+  // Show inherited starting point briefly if not first run
+  const milestone = getMilestone();
+  if (milestone !== 'planetary' || localStorage.getItem('tgf_milestone_planetary')) {
+    const inheritLabels = {
+      planetary:      'BEGINNING AGAIN.',
+      interplanetary: 'YOUR SPECIES REMEMBERS THE WAY TO THE STARS.',
+      interstellar:   'YOUR SPECIES CARRIES THE MEMORY OF OTHER SUNS.',
+      intergalactic:  'YOUR SPECIES HAS SEEN BEYOND THE GALAXY.',
+    };
+    // Flash inherited message briefly then hide
+    const msg = inheritLabels[milestone];
+    if (msg && milestone !== 'planetary') {
+      document.getElementById('surplus-text').textContent = msg;
+      document.getElementById('surplus-bar').classList.remove('hidden');
+      setTimeout(() => {
+        document.getElementById('surplus-text').textContent = '';
+      }, 4000);
+    }
+  }
+
+  // Save that at least one run has happened at planetary level
+  saveMilestone('planetary');
+
   renderPanel();
   updateHUD();
   G.phase = 'playing';
@@ -1475,6 +1571,7 @@ function saveGame() {
       filterTimeLeft: G.filterTimeLeft,
       totalPlanetsEver: G.totalPlanetsEver,
       solarSystemNum: G.solarSystemNum,
+      planetStage: G.planetStage,
       gfWeights: window._gfWeights,
     }));
   }
