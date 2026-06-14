@@ -197,6 +197,35 @@
     gap: 10px;
   }
 
+  /* Bottom row — planet upgrade + logistics side by side */
+  .bottom-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .logistics-card {
+    background: rgba(26,26,62,0.8);
+    border: 1px solid var(--mid);
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.15s;
+  }
+
+  .logistics-card.locked {
+    opacity: 0.3;
+    pointer-events: none;
+  }
+
+  .logistics-card:not(.locked):hover {
+    border-color: var(--blue);
+    background: rgba(79,195,247,0.06);
+  }
+
   .field-card {
     background: rgba(26,26,62,0.8);
     border: 1px solid var(--mid);
@@ -544,10 +573,6 @@
     <div class="hud-value" id="system-display">SOL</div>
   </div>
   <div class="hud-right">
-    <div id="filter-hud" class="hidden">
-      <div class="filter-name-hud" id="filter-name-hud"></div>
-      <div class="filter-timer" id="filter-timer-display">00:10</div>
-    </div>
     <div class="hud-label">WAVE</div>
     <div class="hud-value" id="wave-display">1 / 6</div>
   </div>
@@ -577,6 +602,7 @@
     </div>
   </div>
   <div class="fields-grid" id="fields-grid"></div>
+  <div class="bottom-row" id="bottom-row"></div>
 </div>
 
 <script>
@@ -604,6 +630,333 @@ function initStars() {
       phase: Math.random() * Math.PI * 2
     });
   }
+}
+
+// ═══════════════════════════════════════════
+// TITLE SCREEN ANIMATION STATE
+// ═══════════════════════════════════════════
+let titleScene = {
+  planet: {
+    x: 0, y: 0, r: 90,
+    color: '#4FC3F7', glowColor: '#2196F3',
+    cracks: [],          // crack lines grown over time
+    crumbleChunks: [],   // debris floating away
+    damage: 0,           // 0-1, how destroyed the planet is
+  },
+  asteroids: [],
+  ships: [],
+  impacts: [],           // flash effects on impact
+  initialized: false,
+};
+
+function initTitleScene() {
+  const ts = titleScene;
+  ts.planet.x = W / 2;
+  ts.planet.y = H / 2 + 30;
+  ts.planet.damage = 0;
+  ts.planet.cracks = [];
+  ts.planet.crumbleChunks = [];
+  ts.asteroids = [];
+  ts.ships = [];
+  ts.impacts = [];
+  ts.initialized = true;
+
+  // Spawn initial asteroids
+  for (let i = 0; i < 6; i++) spawnAsteroid();
+
+  // Spawn tiny fleeing ships
+  for (let i = 0; i < 8; i++) spawnShip(true);
+}
+
+function spawnAsteroid() {
+  const ts = titleScene;
+  const angle = Math.random() * Math.PI * 2;
+  const dist = Math.max(W, H) * 0.8;
+  const targetAngle = angle + (Math.random() - 0.5) * 0.4;
+  // Aim roughly at planet with slight spread
+  const tx = ts.planet.x + Math.cos(targetAngle) * (Math.random() * 40 - 20);
+  const ty = ts.planet.y + Math.sin(targetAngle) * (Math.random() * 40 - 20);
+  const sx = ts.planet.x + Math.cos(angle) * dist;
+  const sy = ts.planet.y + Math.sin(angle) * dist;
+  const speed = 0.4 + Math.random() * 0.5;
+  const dx = (tx - sx);
+  const dy = (ty - sy);
+  const len = Math.sqrt(dx*dx + dy*dy);
+  ts.asteroids.push({
+    x: sx, y: sy,
+    vx: (dx/len) * speed,
+    vy: (dy/len) * speed,
+    r: 4 + Math.random() * 8,
+    rot: Math.random() * Math.PI * 2,
+    rotSpeed: (Math.random() - 0.5) * 0.05,
+    color: ['#8B7355','#A0856C','#6B5744','#C4A882'][Math.floor(Math.random()*4)],
+    dead: false,
+  });
+}
+
+function spawnShip(initial) {
+  const ts = titleScene;
+  // Ships flee away from planet — tiny pixel ships
+  const angle = Math.random() * Math.PI * 2;
+  const startDist = initial ? Math.random() * 120 + 60 : ts.planet.r + 20;
+  const speed = 0.3 + Math.random() * 0.4;
+  const fleeDist = Math.max(W, H);
+  ts.ships.push({
+    x: ts.planet.x + Math.cos(angle) * startDist,
+    y: ts.planet.y + Math.sin(angle) * startDist,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    angle: angle,
+    size: 2 + Math.random() * 2,
+    alpha: initial ? Math.random() * 0.6 + 0.2 : 0.8,
+    trail: [],
+    dead: false,
+  });
+}
+
+function spawnCrack(impactX, impactY) {
+  const ts = titleScene;
+  // Grow crack from impact point toward/across planet
+  const numCracks = 2 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < numCracks; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const len = 20 + Math.random() * 40;
+    ts.planet.cracks.push({
+      x1: impactX - ts.planet.x,
+      y1: impactY - ts.planet.y,
+      x2: (impactX - ts.planet.x) + Math.cos(angle) * len,
+      y2: (impactY - ts.planet.y) + Math.sin(angle) * len,
+      alpha: 0.9,
+    });
+  }
+}
+
+function spawnChunks(impactX, impactY) {
+  const ts = titleScene;
+  for (let i = 0; i < 5 + Math.floor(Math.random()*4); i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.3 + Math.random() * 0.8;
+    ts.planet.crumbleChunks.push({
+      x: impactX, y: impactY,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 0.2,
+      r: 2 + Math.random() * 5,
+      rot: Math.random() * Math.PI * 2,
+      rotSpeed: (Math.random()-0.5)*0.08,
+      alpha: 1,
+      color: ts.planet.color,
+    });
+  }
+}
+
+function updateTitleScene(dt) {
+  const ts = titleScene;
+  if (!ts.initialized) return;
+  const p = ts.planet;
+
+  // Move asteroids
+  ts.asteroids.forEach(a => {
+    if (a.dead) return;
+    a.x += a.vx;
+    a.y += a.vy;
+    a.rot += a.rotSpeed;
+
+    // Hit planet?
+    const dx = a.x - p.x; const dy = a.y - p.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist < p.r + a.r) {
+      // Impact!
+      a.dead = true;
+      p.damage = Math.min(1, p.damage + 0.06);
+      spawnCrack(a.x, a.y);
+      spawnChunks(a.x, a.y);
+      // Flash impact
+      ts.impacts.push({ x: a.x, y: a.y, alpha: 1, r: a.r * 3 });
+      // Spawn new ship fleeing from impact
+      if (Math.random() < 0.6) spawnShip(false);
+      // Respawn asteroid after delay
+      setTimeout(spawnAsteroid, 1500 + Math.random() * 3000);
+    }
+
+    // Off screen
+    if (a.x < -100 || a.x > W+100 || a.y < -100 || a.y > H+100) a.dead = true;
+  });
+  ts.asteroids = ts.asteroids.filter(a => !a.dead);
+
+  // Move ships
+  ts.ships.forEach(s => {
+    s.trail.push({x: s.x, y: s.y});
+    if (s.trail.length > 12) s.trail.shift();
+    s.x += s.vx; s.y += s.vy;
+    if (s.x < -50 || s.x > W+50 || s.y < -50 || s.y > H+50) s.dead = true;
+  });
+  ts.ships = ts.ships.filter(s => !s.dead);
+  // Maintain ship count
+  if (ts.ships.length < 6 && Math.random() < 0.008) spawnShip(false);
+
+  // Move chunks
+  ts.planet.crumbleChunks.forEach(c => {
+    c.x += c.vx; c.y += c.vy;
+    c.vy += 0.01; // slight gravity drift
+    c.rot += c.rotSpeed;
+    c.alpha -= 0.003;
+  });
+  ts.planet.crumbleChunks = ts.planet.crumbleChunks.filter(c => c.alpha > 0);
+
+  // Fade impacts
+  ts.impacts.forEach(imp => imp.alpha -= 0.06);
+  ts.impacts = ts.impacts.filter(imp => imp.alpha > 0);
+
+  // Slowly respawn asteroids to keep scene alive
+  if (ts.asteroids.length < 3 && Math.random() < 0.02) spawnAsteroid();
+}
+
+function drawTitleScene(ts_time) {
+  const ts = titleScene;
+  if (!ts.initialized) return;
+  const p = ts.planet;
+  const damage = p.damage;
+
+  // ── Draw planet ──────────────────────────────────────────
+  const px = p.x; const py = p.y; const pr = p.r;
+
+  // Outer glow — dims as planet is damaged
+  const glowAlpha = Math.max(0.1, 1 - damage * 0.7);
+  const glowR = pr + 30 + Math.sin(ts_time * 0.0008) * 5;
+  const glow = ctx.createRadialGradient(px, py, pr*0.4, px, py, glowR);
+  glow.addColorStop(0, `rgba(33,150,243,${glowAlpha * 0.6})`);
+  glow.addColorStop(1, 'rgba(33,150,243,0)');
+  ctx.beginPath();
+  ctx.arc(px, py, glowR, 0, Math.PI*2);
+  ctx.fillStyle = glow;
+  ctx.fill();
+
+  // Planet body — shifts red as damaged
+  const r_channel = Math.floor(79 + damage * 150);
+  const g_channel = Math.floor(195 - damage * 180);
+  const b_channel = Math.floor(247 - damage * 200);
+  const bodyGrad = ctx.createRadialGradient(px-pr*0.3, py-pr*0.3, pr*0.1, px, py, pr);
+  bodyGrad.addColorStop(0, `rgb(${r_channel},${g_channel},${b_channel})`);
+  bodyGrad.addColorStop(0.7, `rgb(${Math.floor(r_channel*0.7)},${Math.floor(g_channel*0.7)},${Math.floor(b_channel*0.7)})`);
+  bodyGrad.addColorStop(1, `rgb(${Math.floor(r_channel*0.4)},${Math.floor(g_channel*0.3)},${Math.floor(b_channel*0.3)})`);
+  ctx.beginPath();
+  ctx.arc(px, py, pr, 0, Math.PI*2);
+  ctx.fillStyle = bodyGrad;
+  ctx.fill();
+
+  // Pixel texture — seeded
+  ctx.globalAlpha = 0.1;
+  for (let t2 = 0; t2 < 50; t2++) {
+    const sx = Math.sin(t2 * 7.3 + 100) * pr * 0.85;
+    const sy = Math.cos(t2 * 5.1 + 100) * pr * 0.85;
+    if (sx*sx+sy*sy < pr*pr*0.9) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(px+sx, py+sy, 3, 3);
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // Crack lines on planet surface
+  p.cracks.forEach(c => {
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.beginPath();
+    ctx.moveTo(c.x1, c.y1);
+    ctx.lineTo(c.x2, c.y2);
+    ctx.strokeStyle = `rgba(255,60,20,${c.alpha * 0.8})`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Glow on cracks
+    ctx.strokeStyle = `rgba(255,120,40,${c.alpha * 0.3})`;
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.restore();
+    c.alpha = Math.max(0.3, c.alpha - 0.0002); // fade slowly
+  });
+
+  // ── Draw floating chunks ──────────────────────────────────
+  p.crumbleChunks.forEach(c => {
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(c.rot);
+    ctx.globalAlpha = c.alpha;
+    ctx.fillStyle = c.color;
+    ctx.fillRect(-c.r/2, -c.r/2, c.r, c.r);
+    ctx.restore();
+  });
+  ctx.globalAlpha = 1;
+
+  // ── Draw impact flashes ───────────────────────────────────
+  ts.impacts.forEach(imp => {
+    ctx.beginPath();
+    ctx.arc(imp.x, imp.y, imp.r * (1 - imp.alpha + 1), 0, Math.PI*2);
+    ctx.fillStyle = `rgba(255,180,50,${imp.alpha})`;
+    ctx.fill();
+  });
+
+  // ── Draw asteroids ────────────────────────────────────────
+  ts.asteroids.forEach(a => {
+    ctx.save();
+    ctx.translate(a.x, a.y);
+    ctx.rotate(a.rot);
+    // Irregular asteroid shape using polygon
+    ctx.beginPath();
+    const sides = 6;
+    for (let i = 0; i < sides; i++) {
+      const ang = (i / sides) * Math.PI * 2;
+      const jitter = 0.7 + Math.sin(i * 17.3) * 0.3;
+      const rx = Math.cos(ang) * a.r * jitter;
+      const ry = Math.sin(ang) * a.r * jitter;
+      i === 0 ? ctx.moveTo(rx, ry) : ctx.lineTo(rx, ry);
+    }
+    ctx.closePath();
+    ctx.fillStyle = a.color;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200,180,150,0.4)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    // Tiny highlight
+    ctx.beginPath();
+    ctx.arc(-a.r*0.2, -a.r*0.2, a.r*0.25, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fill();
+    ctx.restore();
+  });
+
+  // ── Draw ships ────────────────────────────────────────────
+  ts.ships.forEach(s => {
+    // Trail first
+    s.trail.forEach((pt, ti) => {
+      const talpha = (ti / s.trail.length) * s.alpha * 0.3;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 0.8, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(150,220,255,${talpha})`;
+      ctx.fill();
+    });
+
+    // Ship body — tiny pixel ship pointing away from planet
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.rotate(s.angle);
+    ctx.globalAlpha = s.alpha;
+
+    // Body
+    ctx.fillStyle = '#B0D8F0';
+    ctx.fillRect(-s.size*1.5, -s.size*0.4, s.size*3, s.size*0.8);
+    // Nose
+    ctx.fillStyle = '#E8F4FF';
+    ctx.fillRect(s.size*1.5, -s.size*0.3, s.size*0.8, s.size*0.6);
+    // Wings
+    ctx.fillStyle = '#7AAABB';
+    ctx.fillRect(-s.size*0.5, -s.size, s.size*0.8, s.size*0.6);
+    ctx.fillRect(-s.size*0.5, s.size*0.4, s.size*0.8, s.size*0.6);
+    // Engine glow
+    ctx.fillStyle = `rgba(100,180,255,${0.4 + Math.sin(Date.now()*0.01)*0.2})`;
+    ctx.fillRect(-s.size*2, -s.size*0.2, s.size*0.6, s.size*0.4);
+
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  });
 }
 
 // ═══════════════════════════════════════════
@@ -674,7 +1027,9 @@ const FILTERS = [
       const socBuffer  = socScore * 0.15;
       const planetPenalty = Math.max(0, (planets.length - 1) * 0.06);
       const survival   = cure + foodHelp + socBuffer - foodHarm - planetPenalty;
-      return survival > 0.42;
+      // GDD: filter thresholds increase with planet count
+      const threshold = 0.42 + (planets.length - 1) * 0.04;
+      return survival > threshold;
     }
   },
   {
@@ -696,7 +1051,8 @@ const FILTERS = [
       const planetStrain = Math.max(0, (planets.length - 1) * 0.07 * (1 - socScore));
       // GDD: Society reduces drain during ALL filters — baseline buffer
       const socBuffer = Math.min(f.society.level, cap) / cap * 0.08;
-      return (balance * 0.6 + deterrence + socBuffer - gapPenalty - planetStrain) > 0.32;
+      const warThreshold = 0.32 + (planets.length - 1) * 0.04;
+      return (balance * 0.6 + deterrence + socBuffer - gapPenalty - planetStrain) > warThreshold;
     }
   },
   {
@@ -718,7 +1074,8 @@ const FILTERS = [
       const socPolicy  = Math.min(f.society.level, cap) / cap * 0.35;
       const planetLoad = planets.reduce((a,p) => a + p.energyMult, 0) / planets.length;
       const score      = (avg / cap) * 0.25 + sciSol + socPolicy - enDmg - foodDmg - (planetLoad - 1) * 0.08;
-      return score > 0.30;
+      const climThreshold = 0.30 + (planets.length - 1) * 0.04;
+      return score > climThreshold;
     }
   },
   {
@@ -739,7 +1096,8 @@ const FILTERS = [
       const energyBoost = enScore * 0.2;
       // GDD: Society reduces drain during ALL filters — baseline buffer
       const socBuffer = Math.min(f.society.level, cap) / cap * 0.08;
-      return (combined * 0.65 + energyBoost + socBuffer - gapPenalty) > 0.38;
+      const mgThreshold = 0.38 + (planets.length - 1) * 0.04;
+      return (combined * 0.65 + energyBoost + socBuffer - gapPenalty) > mgThreshold;
     }
   },
   {
@@ -762,7 +1120,8 @@ const FILTERS = [
       // Multi-planet fracture penalty
       const chaos      = Math.max(0, (planets.length - 1) * 0.06 * (1 - socScore));
       const score      = socScore * 0.35 + sciScore * 0.30 + foodScore * 0.15 + minScore * 0.20 - threat - primitive - chaos;
-      return score > 0.32;
+      const sigThreshold = 0.32 + (planets.length - 1) * 0.04;
+      return score > sigThreshold;
     }
   },
   {
@@ -794,21 +1153,31 @@ const FILTERS = [
   }
 ];
 
+// distance_ly: approximate light-year distance from Earth
+// Used for logarithmic distance multiplier on field costs
+// dist_mult = 1.0 + log10(dist_ly * 1000 + 1) * 0.4
+// Sol system worlds get 0.00001 ly (negligible, dist_mult ~= 1.0)
 const PLANETS = [
-  { name: "EARTH", color: "#4FC3F7", glowColor: "#2196F3", foodMult: 1.0, energyMult: 1.0, sciMult: 1.0, socMult: 1.0, known: true, system: "SOL" },
-  { name: "MARS", color: "#CF6F3A", glowColor: "#FF5722", foodMult: 2.8, energyMult: 2.0, sciMult: 1.0, socMult: 1.2, known: true, system: "SOL" },
-  { name: "EUROPA", color: "#B0BEC5", glowColor: "#90A4AE", foodMult: 4.5, energyMult: 2.5, sciMult: 0.7, socMult: 1.5, known: true, system: "SOL" },
-  { name: "TITAN", color: "#FFA726", glowColor: "#FF9800", foodMult: 3.2, energyMult: 1.8, sciMult: 0.8, socMult: 2.0, known: true, system: "SOL" },
-  { name: "KEPLER-452b", color: "#81C784", glowColor: "#4CAF50", foodMult: 1.1, energyMult: 1.2, sciMult: 1.0, socMult: 1.8, known: false, system: "KEPLER" },
-  { name: "KEPLER-62f", color: "#A5D6A7", glowColor: "#66BB6A", foodMult: 1.3, energyMult: 1.4, sciMult: 0.9, socMult: 2.2, known: false, system: "KEPLER" },
-  { name: "PROXIMA b", color: "#CE93D8", glowColor: "#AB47BC", foodMult: 2.0, energyMult: 3.5, sciMult: 1.2, socMult: 1.0, known: false, system: "PROXIMA" },
-  { name: "TRAPPIST-1e", color: "#80CBC4", glowColor: "#26A69A", foodMult: 1.5, energyMult: 2.0, sciMult: 0.8, socMult: 1.6, known: false, system: "TRAPPIST" },
-  { name: "TRAPPIST-1f", color: "#80DEEA", glowColor: "#00BCD4", foodMult: 1.8, energyMult: 1.6, sciMult: 1.1, socMult: 1.4, known: false, system: "TRAPPIST" },
-  { name: "GJ 667Cc", color: "#FFAB91", glowColor: "#FF7043", foodMult: 2.5, energyMult: 2.8, sciMult: 1.5, socMult: 1.0, known: false, system: "GJ667" },
-  { name: "HD 40307g", color: "#B39DDB", glowColor: "#7E57C2", foodMult: 3.0, energyMult: 2.2, sciMult: 1.3, socMult: 1.8, known: false, system: "HD40307" },
-  { name: "UNKNOWN-α", color: "#F48FB1", glowColor: "#E91E63", foodMult: 4.0, energyMult: 4.0, sciMult: 2.0, socMult: 3.0, known: false, system: "UNKNOWN" },
-  { name: "UNKNOWN-β", color: "#FFE082", glowColor: "#FFC107", foodMult: 5.0, energyMult: 3.0, sciMult: 0.5, socMult: 4.0, known: false, system: "UNKNOWN" },
+  { name: "EARTH",      color: "#4FC3F7", glowColor: "#2196F3", foodMult: 1.0, energyMult: 1.0, sciMult: 1.0, socMult: 1.0, known: true,  system: "SOL",     distance_ly: 0.00001 },
+  { name: "MARS",       color: "#CF6F3A", glowColor: "#FF5722", foodMult: 2.8, energyMult: 2.0, sciMult: 1.0, socMult: 1.2, known: true,  system: "SOL",     distance_ly: 0.000015 },
+  { name: "EUROPA",     color: "#B0BEC5", glowColor: "#90A4AE", foodMult: 4.5, energyMult: 2.5, sciMult: 0.7, socMult: 1.5, known: true,  system: "SOL",     distance_ly: 0.000066 },
+  { name: "TITAN",      color: "#FFA726", glowColor: "#FF9800", foodMult: 3.2, energyMult: 1.8, sciMult: 0.8, socMult: 2.0, known: true,  system: "SOL",     distance_ly: 0.00013 },
+  { name: "KEPLER-452b",color: "#81C784", glowColor: "#4CAF50", foodMult: 1.1, energyMult: 1.2, sciMult: 1.0, socMult: 1.8, known: false, system: "KEPLER",  distance_ly: 1400 },
+  { name: "KEPLER-62f", color: "#A5D6A7", glowColor: "#66BB6A", foodMult: 1.3, energyMult: 1.4, sciMult: 0.9, socMult: 2.2, known: false, system: "KEPLER",  distance_ly: 1200 },
+  { name: "PROXIMA b",  color: "#CE93D8", glowColor: "#AB47BC", foodMult: 2.0, energyMult: 3.5, sciMult: 1.2, socMult: 1.0, known: false, system: "PROXIMA", distance_ly: 4.2 },
+  { name: "TRAPPIST-1e",color: "#80CBC4", glowColor: "#26A69A", foodMult: 1.5, energyMult: 2.0, sciMult: 0.8, socMult: 1.6, known: false, system: "TRAPPIST",distance_ly: 39 },
+  { name: "TRAPPIST-1f",color: "#80DEEA", glowColor: "#00BCD4", foodMult: 1.8, energyMult: 1.6, sciMult: 1.1, socMult: 1.4, known: false, system: "TRAPPIST",distance_ly: 39 },
+  { name: "GJ 667Cc",   color: "#FFAB91", glowColor: "#FF7043", foodMult: 2.5, energyMult: 2.8, sciMult: 1.5, socMult: 1.0, known: false, system: "GJ667",   distance_ly: 23.6 },
+  { name: "HD 40307g",  color: "#B39DDB", glowColor: "#7E57C2", foodMult: 3.0, energyMult: 2.2, sciMult: 1.3, socMult: 1.8, known: false, system: "HD40307", distance_ly: 42 },
+  { name: "UNKNOWN-α",  color: "#F48FB1", glowColor: "#E91E63", foodMult: 4.0, energyMult: 4.0, sciMult: 2.0, socMult: 3.0, known: false, system: "UNKNOWN", distance_ly: 5000 },
+  { name: "UNKNOWN-β",  color: "#FFE082", glowColor: "#FFC107", foodMult: 5.0, energyMult: 3.0, sciMult: 0.5, socMult: 4.0, known: false, system: "UNKNOWN", distance_ly: 12000 },
 ];
+
+// GDD: logarithmic distance multiplier — compresses 15 orders of magnitude into 1.0-3.5x
+// Player never sees this number — felt through costs
+function getDistanceMult(planet) {
+  return 1.0 + Math.log10(planet.distance_ly * 1000 + 1) * 0.4;
+}
 
 let G = {}; // game state
 
@@ -833,6 +1202,34 @@ function freshFields() {
     science: { level: 0, emoji: "🔬", name: "SCIENCE", baseCost: 10 },
     society: { level: 0, emoji: "🤝", name: "SOCIETY", baseCost: 10 },
   };
+}
+
+// GDD: Logistics unlocks at interplanetary — separate from the 4 fields
+// level 0 = 30% efficiency (shipping tax brutal)
+// level max = ~100% efficiency (local supply chains built)
+// logistics efficiency = 0.3 + (level / MAX_LOGISTICS) * 0.7
+const MAX_LOGISTICS = 20;
+const LOGISTICS_COST_BASE = 15; // flat like science — civilization-wide infrastructure
+
+function getLogisticsEfficiency() {
+  if (G.currentPlanets.length < 2) return 1.0; // single planet — no logistics needed
+  return 0.3 + (G.logistics / MAX_LOGISTICS) * 0.7;
+}
+
+function getLogisticsCost() {
+  // Cost scales with level like science — flat, civilization-wide
+  return Math.round(LOGISTICS_COST_BASE * (1 + G.logistics * 0.6));
+}
+
+function investLogistics() {
+  if (G.currentPlanets.length < 2) return; // locked on single planet
+  const cost = getLogisticsCost();
+  if (G.coins < cost) return;
+  sfxInvest();
+  G.coins -= cost;
+  G.logistics++;
+  renderPanel();
+  updateHUD();
 }
 
 function initGameState() {
@@ -917,6 +1314,7 @@ function initGameState() {
     totalPlanetsEver,
     solarSystemNum,
     planetStage: 0,    // always resets
+    logistics: 0,      // resets on new planet — building supply chains from scratch
     glitching: false,
     planetCracked: false,
     planetGlowing: false,
@@ -931,8 +1329,8 @@ function updateIncomeRate() {
   // GDD: ONLY planet stage doubles per/sec — fields do not affect income
   // 8 * 2^stage = 8, 16, 32, 64, 128
   const stageBase = 10 * Math.pow(2, G.planetStage);
-  // More planets = civilization spans more worlds = more income
-  const planetMult = Math.pow(1.8, planets.length - 1);
+  // GDD: income scales at 1.4x per planet — complexity grows faster than wealth
+  const planetMult = Math.pow(1.4, planets.length - 1);
   // Hostile planets drain efficiency slightly
   const avgHostility = planets.reduce((a,p) => a + (p.foodMult + p.energyMult) / 2, 0) / planets.length;
   const hostilityDrain = avgHostility * 0.4 + 0.6;
@@ -964,26 +1362,53 @@ function upgradePlanet() {
 function getFieldCost(fieldKey) {
   const f = G.fields[fieldKey];
   const planets = G.currentPlanets;
-  // GDD: cost reflects combined weight of ALL planets civilization spans
-  // Science is planet-neutral per GDD — same return regardless of planet
+  const n = planets.length;
+
+  // GDD: Science is planet-neutral — same cost regardless of planet or distance
+  // But still compounds with planet count (more worlds = more research distributed)
   if (fieldKey === 'science') {
-    return Math.round(f.baseCost * (1 + f.level * 0.5));
+    const planetCountMult = 1 + (n - 1) * 0.2;
+    return Math.round(f.baseCost * (1 + f.level * 0.5) * planetCountMult);
   }
+
   const multKey = { food: 'foodMult', energy: 'energyMult', society: 'socMult' }[fieldKey];
-  const avgMult = planets.reduce((a, p) => a + p[multKey], 0) / planets.length;
-  return Math.round(f.baseCost * (1 + f.level * 0.5) * avgMult);
+
+  // Average planet profile mult across all planets
+  const avgProfileMult = planets.reduce((a, p) => a + p[multKey], 0) / n;
+
+  // GDD: distance multiplier — log-compressed, felt through costs not shown
+  // Average distance of all non-home planets (home = Earth, always index 0)
+  let avgDistMult = 1.0;
+  if (n > 1) {
+    const outerDists = planets.slice(1).map(p => getDistanceMult(p));
+    avgDistMult = outerDists.reduce((a,b) => a+b, 0) / outerDists.length;
+  }
+
+  // GDD: logistics efficiency reduces the distance shipping tax
+  // On single planet logistics has no effect (efficiency = 1.0)
+  const logEff = getLogisticsEfficiency();
+
+  // GDD: planet count compounding — each additional planet makes all fields harder
+  const planetCountMult = 1 + (n - 1) * 0.3;
+
+  // Final cost formula:
+  // base × level_scaling × planet_profile × (distance_mult / logistics_eff) × planet_count_compound
+  const distLogisticsMult = n > 1 ? (avgDistMult / logEff) : 1.0;
+
+  return Math.round(f.baseCost * (1 + f.level * 0.5) * avgProfileMult * distLogisticsMult * planetCountMult);
 }
 
 // ═══════════════════════════════════════════
 // RENDER PANEL
 // ═══════════════════════════════════════════
 function renderPanel() {
+  // ── Top row: 4 field cards ──────────────────────────────
   const grid = document.getElementById('fields-grid');
   grid.innerHTML = '';
   Object.entries(G.fields).forEach(([key, f]) => {
     const cost = getFieldCost(key);
     const canAfford = G.coins >= cost;
-    const maxLevel = 25;
+    const maxLevel = 30;
     const pct = (f.level / maxLevel) * 100;
     const card = document.createElement('div');
     card.className = 'field-card';
@@ -998,40 +1423,72 @@ function renderPanel() {
     grid.appendChild(card);
   });
 
+  // ── Bottom row: Planet Upgrade + Logistics side by side ──
+  const bottomRow = document.getElementById('bottom-row');
+  bottomRow.innerHTML = '';
+
   // Planet upgrade card
   const upgradeCost = getPlanetUpgradeCost();
   const stageNames = ['BARREN', 'SETTLING', 'GROWING', 'THRIVING', 'PEAK'];
-  const upgradeCard = document.createElement('div');
-  upgradeCard.className = 'field-card';
-  upgradeCard.style.borderColor = upgradeCost && G.coins >= upgradeCost ? '#F5A623' : '';
-  upgradeCard.style.gridColumn = '1 / -1'; // full width
-  upgradeCard.style.flexDirection = 'row';
-  upgradeCard.style.alignItems = 'center';
-  upgradeCard.style.gap = '16px';
-  upgradeCard.style.padding = '10px 14px';
-
-  // Stage dots
   const dots = Array.from({length: 5}, (_,i) =>
-    `<span style="color:${i <= G.planetStage ? '#F5A623' : '#2A2A50'};font-size:10px;">●</span>`
+    `<span style="color:${i <= G.planetStage ? '#F5A623' : '#2A2A50'};font-size:9px;">●</span>`
   ).join(' ');
 
+  const upgradeCard = document.createElement('div');
+  upgradeCard.className = 'field-card';
+  upgradeCard.style.flexDirection = 'row';
+  upgradeCard.style.alignItems = 'center';
+  upgradeCard.style.gap = '12px';
+  upgradeCard.style.padding = '10px 14px';
+  upgradeCard.style.borderColor = upgradeCost && G.coins >= upgradeCost ? '#F5A623' : '';
   upgradeCard.innerHTML = `
-    <div style="font-size:18px">🪐</div>
-    <div style="flex:1;">
+    <div style="font-size:16px">🪐</div>
+    <div style="flex:1;min-width:0;">
       <div class="field-name">PLANET — ${stageNames[G.planetStage]}</div>
-      <div style="margin-top:4px;">${dots}</div>
-      <div class="field-cost" style="margin-top:4px; color: var(--dim);">UPGRADE → ${10 * Math.pow(2, G.planetStage + 1)}/SEC</div>
+      <div style="margin-top:3px;">${dots}</div>
+      <div class="field-cost" style="margin-top:3px;color:var(--dim);">→ ${10 * Math.pow(2, G.planetStage + 1)}/SEC</div>
     </div>
     ${upgradeCost
-      ? `<button class="invest-btn" style="width:auto;padding:8px 16px;white-space:nowrap;"
+      ? `<button class="invest-btn" style="width:auto;padding:6px 10px;white-space:nowrap;font-size:clamp(4px,0.6vw,6px);"
            ${G.coins >= upgradeCost ? '' : 'disabled'}
            onclick="upgradePlanet()">
-           UPGRADE — ${upgradeCost} 💰
+           ${upgradeCost}💰
          </button>`
-      : `<div class="field-name" style="color:#39FF14;">MAX</div>`
+      : `<div class="field-name" style="color:#39FF14;font-size:clamp(4px,0.6vw,6px);">MAX</div>`
     }
   `;
-  grid.appendChild(upgradeCard);
+  bottomRow.appendChild(upgradeCard);
+
+  // Logistics card — locked on single planet, visible but greyed
+  const isInterplanetary = G.currentPlanets.length >= 2;
+  const logCost = getLogisticsCost();
+  const logEff = getLogisticsEfficiency();
+  const logPct = (G.logistics / MAX_LOGISTICS) * 100;
+  const logCanAfford = G.coins >= logCost && isInterplanetary;
+
+  const logCard = document.createElement('div');
+  logCard.className = `logistics-card${isInterplanetary ? '' : ' locked'}`;
+  logCard.style.borderColor = isInterplanetary && logCanAfford ? '#4FC3F7' : '';
+  logCard.innerHTML = `
+    <div style="font-size:16px">🚀</div>
+    <div style="flex:1;min-width:0;">
+      <div class="field-name" style="color:${isInterplanetary ? 'var(--blue)' : 'var(--dim)'};">LOGISTICS</div>
+      <div class="field-level" style="color:${isInterplanetary ? 'var(--blue)' : 'var(--dim)'};">LV ${G.logistics}</div>
+      <div class="field-bar" style="margin-top:3px;"><div class="field-bar-fill" style="width:${logPct}%;background:var(--blue);"></div></div>
+      <div class="field-cost" style="margin-top:3px;color:var(--dim);">EFF: ${Math.round(logEff*100)}%</div>
+    </div>
+    ${isInterplanetary
+      ? (G.logistics < MAX_LOGISTICS
+          ? `<button class="invest-btn" style="width:auto;padding:6px 10px;white-space:nowrap;font-size:clamp(4px,0.6vw,6px);border-color:var(--blue);color:var(--blue);"
+               ${logCanAfford ? '' : 'disabled'}
+               onclick="investLogistics()">
+               ${logCost}💰
+             </button>`
+          : `<div class="field-name" style="color:#39FF14;font-size:clamp(4px,0.6vw,6px);">MAX</div>`)
+      : `<div class="field-cost" style="color:var(--dim);font-size:clamp(4px,0.6vw,5px);">UNLOCKS<br>INTERPLANETARY</div>`
+    }
+  `;
+  bottomRow.appendChild(logCard);
 }
 
 
@@ -1065,18 +1522,14 @@ function updateHUD() {
   document.getElementById('planet-name-display').textContent = cp.name;
   document.getElementById('planet-name-display').style.color = cp.glowColor;
 
-  // Filter timer
+  // Filter timer — only shown in investment panel (bottom right)
   if (G.currentWave < 5 && !G.filterActive) {
     const t = Math.ceil(G.filterTimeLeft);
     const mins = Math.floor(t / 60).toString().padStart(2,'0');
     const secs = (t % 60).toString().padStart(2,'0');
     document.getElementById('next-filter-display').textContent = `${mins}:${secs}`;
-    document.getElementById('filter-name-hud').textContent = FILTERS[G.currentWave].name;
-    document.getElementById('filter-hud').classList.remove('hidden');
   } else if (G.currentWave === 5) {
     document.getElementById('next-filter-display').textContent = '???';
-    document.getElementById('filter-name-hud').textContent = '✨ APPROACHING';
-    document.getElementById('filter-hud').classList.remove('hidden');
   }
 
   // No hints — GDD: player learns through failure alone
@@ -1130,12 +1583,14 @@ function gameLoop(ts) {
       }
     }
 
-    // Update HUD timer live
+    // Update panel timer live
     if (!G.filterActive && G.currentWave < 5) {
       const t = Math.ceil(G.filterTimeLeft);
       const mins = Math.floor(t / 60).toString().padStart(2,'0');
       const secs = (t % 60).toString().padStart(2,'0');
       document.getElementById('next-filter-display').textContent = `${mins}:${secs}`;
+    } else if (!G.filterActive && G.currentWave === 5) {
+      document.getElementById('next-filter-display').textContent = '???';
     }
   }
 
@@ -1359,6 +1814,7 @@ function continueAfterWin() {
   if (nextPlanet) {
     G.totalPlanetsEver++;
     G.planetStage = 0; // GDD: resets on every new planet
+    G.logistics = 0;   // GDD: supply chains built from scratch on each new world
     G.currentWave = 0;
     // Record milestone as civilization expands
     recordMilestoneFromCurrentState();
@@ -1415,6 +1871,15 @@ function drawSpace(ts) {
     ctx.fillStyle = `rgba(232,232,255,${s.alpha})`;
     ctx.fill();
   });
+
+  // Title screen: crumbling planet + asteroids + fleeing ships
+  const titleEl = document.getElementById('title-screen');
+  if (titleEl && !titleEl.classList.contains('hidden')) {
+    if (!titleScene.initialized) initTitleScene();
+    updateTitleScene(ts);
+    drawTitleScene(ts);
+    return; // don't draw gameplay planets on title
+  }
 
   if (G.phase && G.phase !== 'gameover' && G.currentPlanets) {
     drawPlanets(ts);
@@ -1568,6 +2033,19 @@ function restartGame() {
   startGame();
 }
 
+function goToTitle() {
+  // Return to title — reset title scene for fresh animation
+  titleScene.initialized = false;
+  ['gameover-screen','win-screen','move-screen','great-filter-screen','filter-overlay',
+   'hud','invest-panel','planet-info','surplus-bar']
+    .forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('hidden');
+    });
+  document.getElementById('warning-bar').style.display = 'none';
+  document.getElementById('title-screen').classList.remove('hidden');
+}
+
 function confirmMove() {
   // handled inline per move
 }
@@ -1589,6 +2067,7 @@ function saveGame() {
       totalPlanetsEver: G.totalPlanetsEver,
       solarSystemNum: G.solarSystemNum,
       planetStage: G.planetStage,
+      logistics: G.logistics,
       gfWeights: window._gfWeights,
     }));
   }
@@ -1765,7 +2244,14 @@ function updateSpeakerBtn() {
 // ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
-window.addEventListener('resize', () => { resize(); initStars(); });
+window.addEventListener('resize', () => {
+  resize();
+  initStars();
+  if (titleScene.initialized) {
+    titleScene.planet.x = W/2;
+    titleScene.planet.y = H/2 + 30;
+  }
+});
 resize();
 initStars();
 requestAnimationFrame(gameLoop);
